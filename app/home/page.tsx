@@ -8,10 +8,7 @@ export default function HomePage() {
         <div className="vx-eyebrow-with-line justify-center mb-3">
           <span className="vx-eyebrow">Veraxius</span>
         </div>
-        <h1 className="vx-h3 mb-3">Bienvenido</h1>
-        <p className="vx-body">
-          Inicio de sesión simulado exitoso. Esta es la pantalla fija de inicio.
-        </p>
+        <h1 className="vx-h3 mb-3">Welcome</h1>
       </div>
     </main>
   );
