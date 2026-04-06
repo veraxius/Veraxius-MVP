@@ -5,19 +5,36 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { saveAuth } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
-    setTimeout(() => {
-      router.push("/home");
-    }, 600);
+    try {
+      const res = await fetch("http://localhost:3001/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Login failed");
+      }
+      saveAuth(data.token, data.user);
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err?.message || "Unexpected error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -84,6 +101,9 @@ export default function LoginPage() {
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
+            {error && (
+              <p className="vx-body-sm text-red mt-2">{error}</p>
+            )}
           </form>
 
           <div className="mt-6 text-center">
