@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { getAuth } from "./auth";
+import { API_URL } from "./api";
 
 type NewMessagePayload = { id: string; conversationId: string; senderId: string; content: string; created_at: string };
 
@@ -12,7 +13,7 @@ export function useSocket() {
 	useEffect(() => {
 		const auth = getAuth();
 		const token = auth?.token;
-		const socket = io("http://localhost:3001", {
+		const socket = io(API_URL, {
 			auth: { token },
 			withCredentials: true
 		});

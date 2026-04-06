@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getAuth } from "@/lib/auth";
-import { useConversations } from "@/lib/useConversations";
 import { cn } from "@/lib/utils";
-
-const API_BASE = "http://localhost:3001";
+import { API_URL } from "@/lib/api";
 
 type UserLite = { id: string; email: string };
 
@@ -18,7 +16,7 @@ export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target
 
 	const search = useCallback(async (query: string) => {
 		const token = getAuth()?.token;
-		const url = new URL(`${API_BASE}/api/users/search`);
+		const url = new URL(`${API_URL}/api/users/search`);
 		url.searchParams.set("q", query);
 		const res = await fetch(url.toString(), {
 			headers: {

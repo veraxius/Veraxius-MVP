@@ -12,8 +12,10 @@ import { prisma } from "./config/prisma";
 
 const app = express();
 
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: FRONTEND_URL,
   credentials: true
 }));
 app.use(express.json());
@@ -30,10 +32,7 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  cors: {
-    origin: "http://localhost:3000",
-    credentials: true
-  }
+  cors: { origin: FRONTEND_URL, credentials: true }
 });
 
 // Socket auth middleware

@@ -2,8 +2,7 @@
 
 import { useCallback } from "react";
 import { getAuth } from "./auth";
-
-const API_BASE = "http://localhost:3001";
+import { API_URL } from "./api";
 
 export function useConversations() {
 	const authHeader = () => {
@@ -12,7 +11,7 @@ export function useConversations() {
 	};
 
 	const list = useCallback(async () => {
-		const res = await fetch(`${API_BASE}/api/conversations`, {
+		const res = await fetch(`${API_URL}/api/conversations`, {
 			headers: {
 				"Content-Type": "application/json",
 				...authHeader()
@@ -24,7 +23,7 @@ export function useConversations() {
 	}, []);
 
 	const history = useCallback(async (conversationId: string) => {
-		const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/messages`, {
+		const res = await fetch(`${API_URL}/api/conversations/${conversationId}/messages`, {
 			headers: {
 				"Content-Type": "application/json",
 				...authHeader()
@@ -36,7 +35,7 @@ export function useConversations() {
 	}, []);
 
 	const createConversation = useCallback(async (targetUserId: string) => {
-		const res = await fetch(`${API_BASE}/api/conversations`, {
+		const res = await fetch(`${API_URL}/api/conversations`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
