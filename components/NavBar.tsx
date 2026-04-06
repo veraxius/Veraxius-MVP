@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 
 export function NavBar() {
 	const pathname = usePathname();
@@ -16,7 +17,18 @@ export function NavBar() {
 		>
 			<div className="w-full pl-2 pr-2 sm:pl-4 sm:pr-4">
 				<div className="h-14 flex items-center">
-					<div className="flex-1" />
+					<div className="flex items-center">
+						<Link href="/home" aria-label="Veraxius Home" className="inline-flex items-center">
+							<Image
+								src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
+								alt="Veraxius"
+								width={140}
+								height={28}
+								className="h-7 w-auto"
+								priority
+							/>
+						</Link>
+					</div>
 					<div className="flex items-center gap-2 ml-auto mr-0">
 						{isHome ? (
 							<>
