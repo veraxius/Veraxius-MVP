@@ -14,6 +14,14 @@ model User {
   created_at   DateTime                  @default(now())
   participants ConversationParticipant[]
   messages     Message[]
+  // AIM fields
+  aimScore     Float                     @default(0)
+  aimStatus    String                    @default("stable") // increasing | decreasing | decaying
+  // AIM relations
+  aimEvents                 AimEvent[]
+  aimScoreHistory           AimScoreHistory[]
+  aimChallengesAsTarget     AimChallenge[]           @relation("TargetUser")
+  aimChallengesAsChallenger AimChallenge[]           @relation("ChallengerUser")
 }
 
 model Conversation {
@@ -42,4 +50,44 @@ model Message {
   senderId       String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   sender         User         @relation(fields: [senderId], references: [id])
+}
+
+// AIM MODELS
+model AimEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  value     Float
+  context   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AimScoreHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  score     Float
+  context   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AimChallenge {
+  id              String   @id @default(uuid())
+  targetUserId    String
+  challengerId    String
+  status          String   @default("pending")
+  impact          Float?
+  createdAt       DateTime @default(now())
+
+  targetUser User @relation("TargetUser", fields: [targetUserId], references: [id])
+  challenger User @relation("ChallengerUser", fields: [challengerId], references: [id])
+
+  @@index([targetUserId])
 }

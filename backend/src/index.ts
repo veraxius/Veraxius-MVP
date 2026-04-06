@@ -8,6 +8,7 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import conversationsRouter from "./routes/conversations";
 import usersRouter from "./routes/users";
+import aimRouter from "./routes/aim";
 import { prisma } from "./config/prisma";
 
 const app = express();
@@ -27,6 +28,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/conversations", conversationsRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/aim", aimRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 

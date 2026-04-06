@@ -32,7 +32,7 @@ export default function RegisterPage() {
       }
       // auto-login
       saveAuth(data.token, data.user);
-      router.push("/dashboard");
+      router.push("/home");
     } catch (err: any) {
       setError(err?.message || "Unexpected error");
     } finally {

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAuth, clearAuth } from "@/lib/auth";
+import { getAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { ConversationList } from "@/components/ConversationList";
 import { ConversationSearch } from "@/components/ConversationSearch";
 import { ChatWindow } from "@/components/ChatWindow";
 
-export default function DashboardPage() {
+export default function MessagesPage() {
 	const router = useRouter();
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [selectedTargetUserId, setSelectedTargetUserId] = useState<string | null>(null);
@@ -26,20 +26,11 @@ export default function DashboardPage() {
 			className="h-screen w-full"
 			style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
 		>
-			<div className="h-full w-full mx-auto max-w-vx-content flex">
+			<div className="h-full w-full flex">
 				{/* Left column: sidebar */}
 				<div className="w-[320px] h-full border-r border-[var(--divider)] flex flex-col">
-					<div className="p-3 flex items-center justify-between border-b border-[var(--divider)]">
-						<h2 className="vx-h4">Chats</h2>
-						<button
-							className="vx-btn-secondary rounded-lg px-3 py-2"
-							onClick={() => {
-								clearAuth();
-								router.replace("/login");
-							}}
-						>
-							Log out
-						</button>
+					<div className="p-3 flex items-center justify-center border-b border-[var(--divider)]">
+						<h2 className="vx-h4 text-center w-full">Chats</h2>
 					</div>
 					<ConversationSearch
 						onSelectTarget={(targetId) => {
@@ -69,7 +60,7 @@ export default function DashboardPage() {
 						/>
 					) : (
 						<div className="h-full flex items-center justify-center">
-							<p className="vx-body text-tertiary">Seleccioná un chat para empezar</p>
+							<p className="vx-body text-tertiary">Select a chat to get started</p>
 						</div>
 					)}
 				</div>

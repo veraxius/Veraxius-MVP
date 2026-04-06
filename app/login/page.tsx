@@ -30,7 +30,7 @@ export default function LoginPage() {
         throw new Error(data?.error || "Login failed");
       }
       saveAuth(data.token, data.user);
-      router.push("/dashboard");
+      router.push("/home");
     } catch (err: any) {
       setError(err?.message || "Unexpected error");
     } finally {
