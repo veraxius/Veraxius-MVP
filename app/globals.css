@@ -352,3 +352,5 @@ body::before {
   .border-divider { border-color: var(--divider); }
   .border-amber { border-color: var(--amber-border); }
 }
+
+/* noop */
