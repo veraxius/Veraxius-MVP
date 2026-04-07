@@ -1,4 +1,4 @@
-export type AuthUser = { id: string; email: string; created_at?: string };
+export type AuthUser = { id: string; email: string; name?: string; created_at?: string };
 
 const TOKEN_KEY = "vx_token";
 const USER_KEY = "vx_user";

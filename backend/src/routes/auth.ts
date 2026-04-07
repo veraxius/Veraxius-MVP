@@ -9,6 +9,7 @@ const router = Router();
 const RegisterSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
+  name: z.string().min(1).max(80).optional(),
 });
 
 const LoginSchema = RegisterSchema;
@@ -27,7 +28,7 @@ router.post("/register", async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid payload", details: parsed.error.flatten() });
     }
-    const { email, password } = parsed.data;
+    const { email, password, name } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -38,8 +39,8 @@ router.post("/register", async (req, res) => {
     const hashed = await bcrypt.hash(password, saltRounds);
 
     const user = await prisma.user.create({
-      data: { email, password: hashed },
-      select: { id: true, email: true, created_at: true },
+      data: { email, password: hashed, name },
+      select: { id: true, email: true, name: true, created_at: true },
     });
 
     const token = signToken(user.id);
@@ -72,7 +73,7 @@ router.post("/login", async (req, res) => {
     const token = signToken(user.id);
     return res.status(200).json({
       token,
-      user: { id: user.id, email: user.email, created_at: user.created_at },
+      user: { id: user.id, email: user.email, name: user.name, created_at: user.created_at },
     });
   } catch (err: any) {
     // eslint-disable-next-line no-console

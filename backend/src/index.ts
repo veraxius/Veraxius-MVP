@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import conversationsRouter from "./routes/conversations";
 import usersRouter from "./routes/users";
 import aimRouter from "./routes/aim";
+import postsRouter from "./routes/posts";
 import { prisma } from "./config/prisma";
 
 const app = express();
@@ -29,6 +30,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/conversations", conversationsRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/aim", aimRouter);
+app.use("/api/posts", postsRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 

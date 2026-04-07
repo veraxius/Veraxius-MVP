@@ -11,6 +11,7 @@ model User {
   id           String                    @id @default(uuid())
   email        String                    @unique
   password     String
+  name         String?
   created_at   DateTime                  @default(now())
   participants ConversationParticipant[]
   messages     Message[]
@@ -90,4 +91,36 @@ model AimChallenge {
   challenger User @relation("ChallengerUser", fields: [challengerId], references: [id])
 
   @@index([targetUserId])
+}
+
+// COMMUNITY FEED MODELS
+model Post {
+  id           Int            @id @default(autoincrement())
+  userId       String
+  userName     String
+  userVerified Boolean        @default(false)
+  content      String
+  createdAt    DateTime       @default(now())
+  reactions    PostReaction[]
+  comments     Comment[]
+}
+
+model PostReaction {
+  id      Int    @id @default(autoincrement())
+  postId  Int
+  userId  String
+  type    String
+  post    Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, type])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  userId    String
+  userName  String
+  content   String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
