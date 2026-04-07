@@ -45,7 +45,7 @@ export function NavBar() {
 		>
 			<div className="w-full pl-2 pr-2 sm:pl-4 sm:pr-4">
 				<div className="h-14 flex items-center">
-					<div className="flex items-center">
+					<div className="flex items-center ml-1 sm:ml-2">
 						<Link href="/home" aria-label="Veraxius Home" className="inline-flex items-center">
 							<Image
 								src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
