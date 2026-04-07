@@ -10,7 +10,7 @@ import { ChatWindow } from "@/components/ChatWindow";
 export default function MessagesPage() {
 	const router = useRouter();
 	const [selectedId, setSelectedId] = useState<string | null>(null);
-	const [selectedTargetUserId, setSelectedTargetUserId] = useState<string | null>(null);
+	const [selectedTarget, setSelectedTarget] = useState<{ id: string; email: string; name?: string } | null>(null);
 	const [refreshToken, setRefreshToken] = useState(0);
 
 	useEffect(() => {
@@ -33,8 +33,8 @@ export default function MessagesPage() {
 						<h2 className="vx-h4 text-center w-full">Chats</h2>
 					</div>
 					<ConversationSearch
-						onSelectTarget={(targetId) => {
-							setSelectedTargetUserId(targetId);
+						onSelectTarget={(target) => {
+							setSelectedTarget(target);
 							setSelectedId(null);
 						}}
 					/>
@@ -49,12 +49,14 @@ export default function MessagesPage() {
 				<div className="flex-1 h-full p-6">
 					{selectedId ? (
 						<ChatWindow conversationId={selectedId} />
-					) : selectedTargetUserId ? (
+					) : selectedTarget ? (
 						<ChatWindow
-							targetUserId={selectedTargetUserId}
+							targetUserId={selectedTarget.id}
+							targetEmail={selectedTarget.email}
+							targetName={selectedTarget.name}
 							onConversationCreated={(conv) => {
 								setSelectedId(conv.id);
-								setSelectedTargetUserId(null);
+								setSelectedTarget(null);
 								setRefreshToken((x) => x + 1);
 							}}
 						/>

@@ -2,6 +2,9 @@ import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
 import { createAimEvent } from "../lib/aim";
+import { recordPeerFeedback } from "../lib/aimV2";
+import { microRecalcQueue } from "../lib/aimQueue";
+import { recomputeAIMScore } from "../lib/aimV2";
 
 const router = Router();
 
@@ -57,27 +60,39 @@ router.post("/:id/react", requireAuth, async (req, res) => {
 		const post = await prisma.post.findUnique({ where: { id: postId } });
 		if (!post) return res.status(404).json({ error: "Post not found" });
 		const authorUserId = post.userId;
-		const existing = await prisma.postReaction.findUnique({
-			where: { postId_userId_type: { postId, userId, type } }
-		});
-		if (existing) {
-			await prisma.postReaction.delete({ where: { id: existing.id } });
-			// Reverse AIM impact when toggling off
-			if (type === "confiable") {
-				await createAimEvent(authorUserId, "success", -0.05, "reaction:reliable:off");
-			} else if (type === "not_reliable") {
-				await createAimEvent(authorUserId, "contradiction", +0.05, "reaction:not_reliable:off");
+		// Try create first (toggle ON); if unique violation, delete existing (toggle OFF)
+		try {
+			await prisma.postReaction.create({ data: { postId, userId, type } });
+			// Apply AIM impact via Peer Validation engine only on activation
+			const voter = await prisma.user.findUnique({ where: { id: userId }, select: { aimScore: true, aimDomainPrimary: true } });
+			const author = await prisma.user.findUnique({ where: { id: authorUserId }, select: { aimDomainPrimary: true } });
+			const diversity = voter?.aimDomainPrimary && author?.aimDomainPrimary && voter.aimDomainPrimary === author?.aimDomainPrimary ? "same" : "different";
+			// Without a social graph, assume no direct connection => networkDistance=3 (none)
+			await recordPeerFeedback({
+				targetId: authorUserId,
+				voterId: userId,
+				type: type === "not_reliable" ? "dispute" : "endorsement",
+				domain: author?.aimDomainPrimary ?? undefined,
+				aimVoter: voter?.aimScore ?? 0.5,
+				networkDistance: 3,
+				diversity,
+			});
+			// Recompute inmediato tras registrar el feedback
+			await recomputeAIMScore(authorUserId, author?.aimDomainPrimary ?? undefined);
+			return res.json({ toggled: "on" });
+		} catch (e: any) {
+			if (e?.code === "P2002") {
+				const existing = await prisma.postReaction.findUnique({
+					where: { postId_userId_type: { postId, userId, type } },
+					select: { id: true },
+				});
+				if (existing) {
+					await prisma.postReaction.delete({ where: { id: existing.id } }).catch(() => {});
+				}
+				return res.json({ toggled: "off" });
 			}
-			return res.json({ toggled: "off" });
+			throw e;
 		}
-		await prisma.postReaction.create({ data: { postId, userId, type } });
-		// Apply AIM impact when toggling on
-		if (type === "confiable") {
-			await createAimEvent(authorUserId, "success", +0.05, "reaction:reliable:on");
-		} else if (type === "not_reliable") {
-			await createAimEvent(authorUserId, "contradiction", -0.05, "reaction:not_reliable:on");
-		}
-		return res.json({ toggled: "on" });
 	} catch (err: any) {
 		// eslint-disable-next-line no-console
 		console.error("POST /api/posts/:id/react error", err);

@@ -14,7 +14,7 @@ type Message = {
 	created_at: string;
 };
 
-export function ChatWindow({ conversationId, targetUserId, onConversationCreated }: { conversationId?: string; targetUserId?: string; onConversationCreated?: (conv: { id: string }) => void }) {
+export function ChatWindow({ conversationId, targetUserId, targetEmail, targetName, onConversationCreated }: { conversationId?: string; targetUserId?: string; targetEmail?: string; targetName?: string; onConversationCreated?: (conv: { id: string }) => void }) {
 	const { history, createConversation, list } = useConversations();
 	const socket = useSocket();
 	const [messages, setMessages] = useState<Message[]>([]);
@@ -22,7 +22,8 @@ export function ChatWindow({ conversationId, targetUserId, onConversationCreated
 	const [input, setInput] = useState("");
 	const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const convIdRef = useRef<string | undefined>(conversationId);
-	const [peerEmail, setPeerEmail] = useState<string | null>(null);
+	const [peerEmail, setPeerEmail] = useState<string | null>(targetEmail ?? null);
+	const [peerName, setPeerName] = useState<string | null>(null);
 	const [meId, setMeId] = useState<string | null>(null);
 
 	// Load history
@@ -34,7 +35,8 @@ export function ChatWindow({ conversationId, targetUserId, onConversationCreated
 		setMeId(auth?.user?.id ?? null);
 		if (!conversationId) {
 			setMessages([]);
-			setPeerEmail(null);
+			setPeerEmail(targetEmail ?? null);
+			setPeerName(targetName ?? (targetEmail ? String(targetEmail).split("@")[0] : null));
 			return () => { mounted = false; };
 		}
 		(async () => {
@@ -47,7 +49,7 @@ export function ChatWindow({ conversationId, targetUserId, onConversationCreated
 				console.error("Load history error:", err);
 			}
 		})();
-		// Load peer email from conversations list
+		// Load peer identity from conversations list
 		(async () => {
 			try {
 				const auth = getAuth();
@@ -55,13 +57,17 @@ export function ChatWindow({ conversationId, targetUserId, onConversationCreated
 				const listData = await list();
 				const conv = Array.isArray(listData) ? listData.find((c: any) => c.id === conversationId) : null;
 				if (conv && me) {
-					const other = (conv.participants || []).map((p: any) => p.user).find((u: any) => u?.id !== me);
-					setPeerEmail(other?.email ?? null);
+					const other = (conv.participants || []).map((p: any) => p.user).find((u: any) => u?.id !== me) || null;
+					setPeerEmail(other?.email ?? targetEmail ?? null);
+					const fallbackName = other?.email ? String(other.email).split("@")[0] : undefined;
+					setPeerName(other?.name ?? fallbackName ?? targetName ?? null);
 				} else {
-					setPeerEmail(null);
+					setPeerEmail(targetEmail ?? null);
+					setPeerName(targetName ?? (targetEmail ? String(targetEmail).split("@")[0] : null));
 				}
 			} catch {
-				setPeerEmail(null);
+				setPeerEmail(targetEmail ?? null);
+				setPeerName(targetName ?? (targetEmail ? String(targetEmail).split("@")[0] : null));
 			}
 		})();
 		return () => {
@@ -125,12 +131,29 @@ export function ChatWindow({ conversationId, targetUserId, onConversationCreated
 		}, 1200);
 	};
 
+	function initials(text: string) {
+		const parts = String(text || "").split(/\s+/).filter(Boolean);
+		const a = parts[0]?.[0] ?? text?.[0] ?? "";
+		const b = parts[1]?.[0] ?? "";
+		return (a + b).toUpperCase() || (text || "").slice(0, 2).toUpperCase();
+	}
+
 	return (
 		<div className="flex h-full flex-col rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)]">
-			{/* Top navbar inside chat with peer email */}
+			{/* Top navbar inside chat with peer identity */}
 			<div className="h-12 px-4 border-b border-[var(--divider)] flex items-center justify-between">
-				<div className="vx-mono text-sm text-[var(--text-secondary)] truncate">
-					{peerEmail ?? "—"}
+				<div className="flex items-center gap-2 min-w-0">
+					<div
+						className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+						style={{ backgroundColor: "var(--amber)", color: "var(--bg-primary)" }}
+						title={peerEmail ?? undefined}
+					>
+						{initials(peerName ?? peerEmail ?? "U")}
+					</div>
+					<div className="min-w-0">
+						<p className="vx-body text-[var(--text-primary)] truncate">{peerName ?? "—"}</p>
+						<p className="vx-mono-sm text-[var(--text-tertiary)] truncate">{peerEmail ?? ""}</p>
+					</div>
 				</div>
 			</div>
 			<div className="flex-1 overflow-y-auto p-4 space-y-3">

@@ -10,7 +10,9 @@ import conversationsRouter from "./routes/conversations";
 import usersRouter from "./routes/users";
 import aimRouter from "./routes/aim";
 import postsRouter from "./routes/posts";
+import rankingsRouter from "./routes/rankings";
 import { prisma } from "./config/prisma";
+import { applyDecayToAllUsers, runConsistencyCheck } from "./lib/aimV2";
 
 const app = express();
 
@@ -31,6 +33,7 @@ app.use("/api/conversations", conversationsRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/aim", aimRouter);
 app.use("/api/posts", postsRouter);
+app.use("/api/rankings", rankingsRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
@@ -129,4 +132,42 @@ ensureUsersTable().finally(() => {
     // eslint-disable-next-line no-console
     console.log(`API listening on port ${PORT}`);
   });
+
+  // Schedulers (non-blocking, simple timers)
+  // Daily decay at 03:00 UTC
+  const scheduleDaily = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(3, 0, 0, 0);
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    const delay = next.getTime() - now.getTime();
+    setTimeout(async function run() {
+      try { await applyDecayToAllUsers(); } catch (err) { /* eslint-disable-next-line no-console */ console.error("daily decay error", err); }
+      scheduleDaily();
+    }, delay);
+  };
+  scheduleDaily();
+
+  // Weekly consistency check on Mondays at 04:00 UTC
+  const scheduleWeekly = () => {
+    const now = new Date();
+    const next = new Date(now);
+    // 1 = Monday in ISO
+    const day = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+    const daysUntilMonday = (8 - day) % 7;
+    next.setUTCDate(now.getUTCDate() + daysUntilMonday);
+    next.setUTCHours(4, 0, 0, 0);
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 7);
+    const delay = next.getTime() - now.getTime();
+    setTimeout(async function run() {
+      try {
+        const users = await prisma.user.findMany({ select: { id: true } });
+        for (const u of users) {
+          try { await runConsistencyCheck(u.id); } catch { /* ignore per-user */ }
+        }
+      } catch (err) { /* eslint-disable-next-line no-console */ console.error("weekly consistency error", err); }
+      scheduleWeekly();
+    }, delay);
+  };
+  scheduleWeekly();
 });

@@ -103,14 +103,14 @@ export default function HomePage() {
   async function toggleReaction(postId: number, type: "util" | "confiable" | "not_reliable") {
     const auth = getAuth();
     if (!auth?.user?.id) return;
-    const mine = (p: Post) => p.reactions.some(r => r.userId === auth.user.id && r.type === type);
+    const mine = (p: Post) => (p.reactions ?? []).some(r => r.userId === auth.user.id && r.type === type);
     setPosts((p) => p.map(post => {
       if (post.id !== postId) return post;
       const has = mine(post);
       return {
         ...post,
-        reactions: has ? post.reactions.filter(r => !(r.userId === auth.user.id && r.type === type))
-                       : [...post.reactions, { id: -(Date.now()%1e6), postId, userId: auth.user.id, type }]
+        reactions: has ? (post.reactions ?? []).filter(r => !(r.userId === auth.user.id && r.type === type))
+                       : [...(post.reactions ?? []), { id: -(Date.now()%1e6), postId, userId: auth.user.id, type }]
       };
     }));
     try {

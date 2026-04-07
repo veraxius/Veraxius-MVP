@@ -29,7 +29,14 @@ export async function createAimEvent(
   context?: string
 ) {
   const event = await prisma.aimEvent.create({
-    data: { userId, type, value, context },
+    data: {
+      userId,
+      eventType: type,
+      delta: value,
+      weight: 1,
+      contextWeight: 1,
+      metadata: context ? { context } : {},
+    },
   });
 
   await calculateAimScore(userId);
@@ -57,11 +64,11 @@ export async function calculateAimScore(userId: string) {
 
   for (const ev of events) {
     const weight =
-      AIM_SCORING_CONFIG.weightsByType[ev.type as AimEventType] ?? 0;
+      AIM_SCORING_CONFIG.weightsByType[ev.eventType as AimEventType] ?? 0;
 
     const decay = getDecayFactor(ev.createdAt, now);
 
-    score += ev.value * weight * decay;
+    score += ev.delta * weight * decay;
   }
 
   // STATUS
@@ -118,6 +125,8 @@ export async function createChallenge(
       targetUserId,
       challengerId,
       status: "pending",
+      reason: "challenge_opened",
+      severity: 1,
     },
   });
 

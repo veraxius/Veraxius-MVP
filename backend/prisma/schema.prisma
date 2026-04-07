@@ -13,6 +13,9 @@ model User {
   password     String
   name         String?
   created_at   DateTime                  @default(now())
+  lastActiveAt DateTime?
+  aimConfidence Decimal?                 @db.Decimal(3, 2)
+  aimDomainPrimary String?
   participants ConversationParticipant[]
   messages     Message[]
   // AIM fields
@@ -23,6 +26,10 @@ model User {
   aimScoreHistory           AimScoreHistory[]
   aimChallengesAsTarget     AimChallenge[]           @relation("TargetUser")
   aimChallengesAsChallenger AimChallenge[]           @relation("ChallengerUser")
+  aimOutcomes               AimOutcome[]
+  aimConsistency            AimConsistency?
+  aimDomainScores           AimDomainScore[]
+  aimFlags                  AimFlag[]
 }
 
 model Conversation {
@@ -57,9 +64,13 @@ model Message {
 model AimEvent {
   id        String   @id @default(uuid())
   userId    String
-  type      String
-  value     Float
-  context   String?
+  eventType String
+  signal    String?
+  delta     Float
+  weight    Float       @default(1)
+  domain    String?
+  contextWeight Float   @default(1)
+  metadata  Json?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -83,7 +94,10 @@ model AimChallenge {
   id              String   @id @default(uuid())
   targetUserId    String
   challengerId    String
-  status          String   @default("pending")
+  reason          String
+  severity        Int
+  status          String   @default("pending") // pending | resolved | rejected
+  resolution      String?  // positive | negative
   impact          Float?
   createdAt       DateTime @default(now())
 
@@ -91,6 +105,55 @@ model AimChallenge {
   challenger User @relation("ChallengerUser", fields: [challengerId], references: [id])
 
   @@index([targetUserId])
+}
+
+model AimOutcome {
+  userId        String
+  interactionId String
+  quality       Decimal  @db.Decimal(3, 2)
+  verifiedBy    String?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interactionId])
+  @@index([userId])
+}
+
+model AimConsistency {
+  userId       String   @id
+  breakCount   Int      @default(0)
+  matchCount   Int      @default(0)
+  lastSnapshot Json?
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AimDomainScore {
+  userId           String
+  domain           String
+  score            Float      @default(0)
+  confidence       Float      @default(0)
+  interactionCount Int        @default(0)
+  updatedAt        DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, domain])
+  @@index([userId])
+}
+
+model AimFlag {
+  userId    String
+  flagType  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, flagType, createdAt])
+  @@index([userId])
 }
 
 // COMMUNITY FEED MODELS

@@ -43,8 +43,9 @@ export class AIMEngine {
 
 		const breakdown: AimBreakdownItem[] = [];
 		for (const ev of events.slice(0, 10)) {
-			const label = `${ev.type}${ev.context ? ` (${ev.context})` : ""}`;
-			breakdown.push({ label, delta: ev.value });
+			const ctx = (ev.metadata as any)?.context;
+			const label = `${ev.eventType}${ctx ? ` (${ctx})` : ""}`;
+			breakdown.push({ label, delta: ev.delta });
 		}
 
 		return { user, events, history, breakdown };

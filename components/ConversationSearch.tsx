@@ -5,9 +5,9 @@ import { getAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { API_URL } from "@/lib/api";
 
-type UserLite = { id: string; email: string };
+type UserLite = { id: string; email: string; name?: string };
 
-export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (targetUserId: string) => void }) {
+export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target: { id: string; email: string; name?: string }) => void }) {
 	const [q, setQ] = useState("");
 	const [open, setOpen] = useState(false);
 	const [results, setResults] = useState<UserLite[]>([]);
@@ -75,7 +75,7 @@ export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target
 							<button
 								key={u.id}
 								onClick={() => {
-									onSelectTarget(u.id);
+									onSelectTarget({ id: u.id, email: u.email, name: (u as any).name });
 									setOpen(false);
 									setQ("");
 								}}
