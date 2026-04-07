@@ -195,14 +195,8 @@ function Sparkline({ data }: { data: number[] }) {
 }
 
 function CircularScore({ value, history, status }: { value: number; history: AimScoreHistory[]; status: string }) {
-	// Normalize to percentage based on history range for current session
-	const scores = [...history.map(h => h.score), value];
-	const min = Math.min(...scores);
-	const max = Math.max(...scores);
-	const range = max - min || 1;
-	let pct = ((value - min) / range) * 100;
-	if (!isFinite(pct)) pct = 0;
-	pct = Math.max(0, Math.min(100, pct));
+	// Fixed scale: 0–100%
+	let pct = Math.max(0, Math.min(100, value));
 
 	const size = 180;
 	const stroke = 12;
@@ -237,7 +231,7 @@ function CircularScore({ value, history, status }: { value: number; history: Aim
 				/>
 			</svg>
 			<div className="absolute inset-0 flex flex-col items-center justify-center">
-				<div className="text-3xl font-bold">{value.toFixed(2)}</div>
+				<div className="text-3xl font-bold">{value.toFixed(2)}%</div>
 				<div className="text-xs text-gray-600 mt-1">AIM Score</div>
 			</div>
 		</div>

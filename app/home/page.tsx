@@ -6,6 +6,7 @@ import { getAuth } from "@/lib/auth";
 import { ConversationList } from "@/components/ConversationList";
 import { ChatWindow } from "@/components/ChatWindow";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 type Post = {
   id: number;
@@ -265,15 +266,19 @@ function PostCard({ post, onReact, onComment }: { post: Post; onReact: (id: numb
   return (
     <div className="rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4">
       <div className="flex items-start gap-3">
-        <div
-          className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold"
-          style={{ backgroundColor: nameColor(post.userName), color: "#fff" }}
-        >
-          {initials(post.userName)}
-        </div>
+        <Link href={`/profile/${post.userId}`} className="shrink-0" title={post.userName}>
+          <div
+            className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold"
+            style={{ backgroundColor: nameColor(post.userName), color: "#fff" }}
+          >
+            {initials(post.userName)}
+          </div>
+        </Link>
         <div className="flex-1">
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold">{post.userName}</span>
+            <Link href={`/profile/${post.userId}`} className="font-semibold hover:underline">
+              {post.userName}
+            </Link>
             {post.userVerified && <span className="px-1.5 py-0.5 text-amber border border-amber rounded">verificado</span>}
             <span className="text-tertiary">· {relTime(post.createdAt)}</span>
           </div>
