@@ -38,10 +38,10 @@ body {
   position: relative;
 }
 
-/* Disable global scroll to make a fixed single-screen app */
+/* Enable global scroll with custom scrollbar */
 html, body {
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* Subtle noise texture overlay */
@@ -355,3 +355,28 @@ body::before {
 
 /* noop */
 /* noop-2 */
+
+/* Custom scrollbar - matches primary button (amber) */
+/* WebKit */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--amber);
+  border-radius: 8px;
+  border: 2px solid transparent; /* inset look */
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--amber-glow);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--amber) transparent;
+}

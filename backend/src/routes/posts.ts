@@ -95,7 +95,7 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
 			return res.status(400).json({ error: "Invalid payload" });
 		}
 		const user = await prisma.user.findUnique({ where: { id: userId } });
-		const userName = user?.email?.split("@")[0] ?? "user";
+		const userName = user?.name ?? user?.email?.split("@")[0] ?? "user";
 		const comment = await prisma.comment.create({
 			data: { postId, userId, userName, content: content.trim() }
 		});

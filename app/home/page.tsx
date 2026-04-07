@@ -130,7 +130,7 @@ export default function HomePage() {
       id: -(Date.now()%1e6),
       postId,
       userId: auth.user.id,
-      userName: auth.user.email?.split("@")[0] || "me",
+      userName: auth.user.name || auth.user.email?.split("@")[0] || "me",
       content: text.trim(),
       createdAt: new Date().toISOString()
     };
