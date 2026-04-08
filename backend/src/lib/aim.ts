@@ -60,7 +60,8 @@ export async function calculateAimScore(userId: string) {
     orderBy: { createdAt: "asc" },
   });
 
-  let score = 0;
+  // Spec: AIMScore = clamp(baseScore + Σ(deltas), 0, 1) — baseScore = 0.50
+  let score = 0.5;
 
   for (const ev of events) {
     const weight =
@@ -84,9 +85,9 @@ export async function calculateAimScore(userId: string) {
 
     if (recencyDays > AIM_SCORING_CONFIG.decayHalfLifeDays) {
       aimStatus = "decaying";
-    } else if (score > 0) {
+    } else if (score > 0.5) {
       aimStatus = "increasing";
-    } else if (score < 0) {
+    } else if (score < 0.5) {
       aimStatus = "decreasing";
     }
   }

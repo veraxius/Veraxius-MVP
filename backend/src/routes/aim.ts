@@ -12,6 +12,7 @@ import {
 	recomputeAIMScore,
 } from "../lib/aimV2";
 import { microRecalcQueue } from "../lib/aimQueue";
+import { recalculateDomainScore, onPostCreated } from "../lib/domainScoreService";
 
 const router = Router();
 
@@ -133,26 +134,15 @@ router.post("/challenge", async (req, res) => {
 router.post("/challenge/:id/resolve", async (req, res) => {
 	try {
 		const { id } = req.params as { id: string };
-		const { resolution, maliciousByAccuser } = req.body as { resolution: "positive" | "negative"; maliciousByAccuser?: boolean };
-		if (!id || (resolution !== "positive" && resolution !== "negative")) {
-			return res.status(400).json({ error: "Invalid payload" });
+		const { resolution } = req.body as {
+			resolution: "upheld" | "dismissed" | "mixed" | "malicious";
+		};
+		const valid = ["upheld", "dismissed", "mixed", "malicious"];
+		if (!id || !valid.includes(resolution)) {
+			return res.status(400).json({ error: "Invalid payload. resolution must be one of: upheld, dismissed, mixed, malicious" });
 		}
-		const ch = await resolveChallengeV2(id, resolution);
-		// Optional: penalize accuser if malicious intent confirmed
-		if (maliciousByAccuser) {
-			await prisma.aimEvent.create({
-				data: {
-					userId: ch.challengerId,
-					eventType: "contradiction",
-					signal: "malicious_challenge",
-					delta: -0.03,
-					weight: 1,
-					contextWeight: 1,
-					metadata: { challengeId: id },
-				},
-			});
-		}
-		res.json({ challenge: ch });
+		const result = await resolveChallengeV2(id, resolution);
+		res.json({ challenge: result.ch, targetDelta: result.targetDelta, challengerDelta: result.challengerDelta });
 	} catch (err) {
 		// eslint-disable-next-line no-console
 		console.error("POST /api/aim/challenge/:id/resolve", err);
@@ -196,12 +186,76 @@ router.post("/decay/apply", async (_req, res) => {
 	}
 });
 
+// POST /api/aim/domains/recalculate-all
+// One-time admin fix: re-runs recalculateDomainScore for every user/domain pair
+// using the new 0-baseline formula (no artificial 50% starting score).
+// Scores are now 0% until real Reliable / Not Reliable votes arrive.
+router.post("/domains/recalculate-all", async (_req, res) => {
+	try {
+		const all = await prisma.userDomainScore.findMany({
+			select: { userId: true, domainName: true },
+		});
+
+		let updated = 0;
+		for (const row of all) {
+			await recalculateDomainScore(row.userId, row.domainName);
+			updated++;
+		}
+
+		res.json({ ok: true, updated });
+	} catch (err: any) {
+		// eslint-disable-next-line no-console
+		console.error("POST /api/aim/domains/recalculate-all error", err);
+		res.status(500).json({ error: err?.message || "Internal server error" });
+	}
+});
+
+// Admin endpoint: recompute global AIM score for all users (migration helper)
+router.post("/recompute-all", async (_req, res) => {
+	try {
+		const users = await prisma.user.findMany({ select: { id: true } });
+		let updated = 0;
+		for (const u of users) {
+			await recomputeAIMScore(u.id);
+			updated++;
+		}
+		res.json({ ok: true, updated });
+	} catch (err: any) {
+		// eslint-disable-next-line no-console
+		console.error("POST /api/aim/recompute-all error", err);
+		res.status(500).json({ error: err?.message || "Internal server error" });
+	}
+});
+
+// Admin endpoint: reclassify all existing posts into domains (migration helper)
+// Useful after the classifier is updated or the domain keyword list expands.
+router.post("/domains/reclassify-posts", async (_req, res) => {
+	try {
+		const posts = await prisma.post.findMany({
+			select: { id: true, userId: true, content: true },
+			orderBy: { id: "asc" },
+		});
+
+		let classified = 0;
+		for (const post of posts) {
+			await onPostCreated({ id: post.id, userId: post.userId, content: post.content });
+			classified++;
+		}
+
+		res.json({ ok: true, classified });
+	} catch (err: any) {
+		// eslint-disable-next-line no-console
+		console.error("POST /api/aim/domains/reclassify-posts error", err);
+		res.status(500).json({ error: err?.message || "Internal server error" });
+	}
+});
+
 router.get("/:userId", async (req, res) => {
 	try {
 		const { userId } = req.params as { userId: string };
-		const { user, events, history, breakdown } = await engine.getSummary(userId);
+		const { user, events, history, breakdown, activity } = await engine.getSummary(userId);
 		if (!user) return res.status(404).json({ error: "User not found" });
-		res.json({ user, events, history, breakdown });
+		res.json({ user, events, history, breakdown, activity });
 	} catch (err) {
 		// eslint-disable-next-line no-console
 		console.error("GET /api/aim/:userId", err);

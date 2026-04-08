@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
-import { createAimEvent } from "../lib/aim";
 import { recordPeerFeedback } from "../lib/aimV2";
 import { microRecalcQueue } from "../lib/aimQueue";
 import { recomputeAIMScore } from "../lib/aimV2";
+import { onPostCreated, onTrustVote, onPostDeleted } from "../lib/domainScoreService";
 
 const router = Router();
 
@@ -40,6 +40,13 @@ router.post("/", requireAuth, async (req, res) => {
 		const post = await prisma.post.create({
 			data: { userId, userName, userVerified: false, content: content.trim() }
 		});
+
+		// Asynchronously classify post into a domain (fire and forget errors — don't fail the request)
+		onPostCreated({ id: post.id, userId, content: post.content }).catch((err) => {
+			// eslint-disable-next-line no-console
+			console.error("onPostCreated domain classification error", err);
+		});
+
 		res.json(post);
 	} catch (err: any) {
 		// eslint-disable-next-line no-console
@@ -60,25 +67,67 @@ router.post("/:id/react", requireAuth, async (req, res) => {
 		const post = await prisma.post.findUnique({ where: { id: postId } });
 		if (!post) return res.status(404).json({ error: "Post not found" });
 		const authorUserId = post.userId;
+
 		// Try create first (toggle ON); if unique violation, delete existing (toggle OFF)
 		try {
 			await prisma.postReaction.create({ data: { postId, userId, type } });
-			// Apply AIM impact via Peer Validation engine only on activation
-			const voter = await prisma.user.findUnique({ where: { id: userId }, select: { aimScore: true, aimDomainPrimary: true } });
-			const author = await prisma.user.findUnique({ where: { id: authorUserId }, select: { aimDomainPrimary: true } });
-			const diversity = voter?.aimDomainPrimary && author?.aimDomainPrimary && voter.aimDomainPrimary === author?.aimDomainPrimary ? "same" : "different";
-			// Without a social graph, assume no direct connection => networkDistance=3 (none)
-			await recordPeerFeedback({
-				targetId: authorUserId,
-				voterId: userId,
-				type: type === "not_reliable" ? "dispute" : "endorsement",
-				domain: author?.aimDomainPrimary ?? undefined,
-				aimVoter: voter?.aimScore ?? 0.5,
-				networkDistance: 3,
-				diversity,
+
+			// "util" (useful) is NOT a trust signal — only confiable/not_reliable affect AIM
+			const isTrustSignal = type === "confiable" || type === "not_reliable";
+
+			const voter = await prisma.user.findUnique({
+				where: { id: userId },
+				select: { aimScore: true, aimConfidence: true, aimDomainPrimary: true },
 			});
-			// Recompute inmediato tras registrar el feedback
-			await recomputeAIMScore(authorUserId, author?.aimDomainPrimary ?? undefined);
+			const author = await prisma.user.findUnique({
+				where: { id: authorUserId },
+				select: { aimDomainPrimary: true },
+			});
+
+			if (isTrustSignal) {
+				const diversity =
+					voter?.aimDomainPrimary &&
+					author?.aimDomainPrimary &&
+					voter.aimDomainPrimary === author?.aimDomainPrimary
+						? "same"
+						: "different";
+
+				// General AIM peer feedback
+				await recordPeerFeedback({
+					targetId:           authorUserId,
+					voterId:            userId,
+					postId,                                          // per-post cooldown
+					type:               type === "not_reliable" ? "dispute" : "endorsement",
+					domain:             author?.aimDomainPrimary ?? undefined,
+					aimVoter:           voter?.aimScore      ?? 0.5,
+					aimVoterConfidence: Number(voter?.aimConfidence ?? 0),
+					networkDistance:    3,
+					diversity,
+				});
+
+				// Recompute global AIM score
+				microRecalcQueue.enqueue(authorUserId, async () => {
+					await recomputeAIMScore(authorUserId, author?.aimDomainPrimary ?? undefined);
+				});
+			}
+
+			// Domain-specific AIM event (only for trust signals — not "util")
+			if (isTrustSignal) {
+				onTrustVote({
+					postId,
+					postCreatedAt: post.createdAt,
+					postUserId: authorUserId,
+					voterId: userId,
+					voterAimScore: voter?.aimScore ?? 0.5,
+					voterAimConfidence: Number(voter?.aimConfidence ?? 0.5),
+					voterVerified: post.userVerified, // use post author's verification as proxy
+					isPositive: type === "confiable",
+				}).catch((err) => {
+					// eslint-disable-next-line no-console
+					console.error("onTrustVote domain error", err);
+				});
+			}
+
 			return res.json({ toggled: "on" });
 		} catch (e: any) {
 			if (e?.code === "P2002") {
@@ -96,6 +145,32 @@ router.post("/:id/react", requireAuth, async (req, res) => {
 	} catch (err: any) {
 		// eslint-disable-next-line no-console
 		console.error("POST /api/posts/:id/react error", err);
+		res.status(500).json({ error: err?.message || "Internal server error" });
+	}
+});
+
+// DELETE /api/posts/:id - delete a post (protected, owner only)
+router.delete("/:id", requireAuth, async (req, res) => {
+	try {
+		const userId = req.userId as string;
+		const postId = Number(req.params.id);
+		if (!postId) return res.status(400).json({ error: "Invalid post id" });
+
+		const post = await prisma.post.findUnique({ where: { id: postId } });
+		if (!post) return res.status(404).json({ error: "Post not found" });
+		if (post.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+
+		// Reverse domain events before deleting the post
+		await onPostDeleted(postId).catch((err) => {
+			// eslint-disable-next-line no-console
+			console.error("onPostDeleted domain error", err);
+		});
+
+		await prisma.post.delete({ where: { id: postId } });
+		return res.json({ ok: true });
+	} catch (err: any) {
+		// eslint-disable-next-line no-console
+		console.error("DELETE /api/posts/:id error", err);
 		res.status(500).json({ error: err?.message || "Internal server error" });
 	}
 });
@@ -123,4 +198,3 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
 });
 
 export default router;
-

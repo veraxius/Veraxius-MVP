@@ -19,7 +19,7 @@ model User {
   participants ConversationParticipant[]
   messages     Message[]
   // AIM fields
-  aimScore     Float                     @default(0)
+  aimScore     Float                     @default(0.5)
   aimStatus    String                    @default("stable") // increasing | decreasing | decaying
   // AIM relations
   aimEvents                 AimEvent[]
@@ -30,6 +30,11 @@ model User {
   aimConsistency            AimConsistency?
   aimDomainScores           AimDomainScore[]
   aimFlags                  AimFlag[]
+  // Domain system relations
+  postDomains              PostDomain[]
+  userDomainScores         UserDomainScore[]
+  domainAimEvents          DomainAimEvent[]          @relation("DomainEventOwner")
+  domainAimEventsAsVoter   DomainAimEvent[]          @relation("DomainEventVoter")
 }
 
 model Conversation {
@@ -166,6 +171,9 @@ model Post {
   createdAt    DateTime       @default(now())
   reactions    PostReaction[]
   comments     Comment[]
+  // Domain system relations
+  postDomains     PostDomain[]
+  domainAimEvents DomainAimEvent[]
 }
 
 model PostReaction {
@@ -186,4 +194,75 @@ model Comment {
   content   String
   createdAt DateTime @default(now())
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+// DOMAIN SYSTEM MODELS
+
+// Stores the domain classification for each post (primary + optional secondary)
+model PostDomain {
+  id              String   @id @default(uuid())
+  postId          Int
+  userId          String
+  domainName      String
+  confidenceScore Float    @default(0)
+  isPrimary       Boolean  @default(true)
+  rawKeywordScore Float    @default(0)
+  classifiedAt    DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, isPrimary])
+  @@index([userId])
+  @@index([domainName])
+}
+
+// Per-user, per-domain AIM score
+model UserDomainScore {
+  id                   String    @id @default(uuid())
+  userId               String
+  domainName           String
+  domainAimScore       Float     @default(0.50)
+  domainConfidence     Float     @default(0)
+  interactionCount     Int       @default(0)
+  positiveSignals      Int       @default(0)
+  negativeSignals      Int       @default(0)
+  lastActivityAt       DateTime?
+  isPublic             Boolean   @default(false)
+  scoreAt7dAgo         Float?
+  coordinatedBoostFlag Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, domainName])
+  @@index([userId])
+}
+
+// Individual AIM events scoped to a domain (audit log for recalculation)
+model DomainAimEvent {
+  id                   String   @id @default(uuid())
+  userId               String
+  postId               Int?
+  domainName           String
+  eventType            String
+  rawDelta             Float
+  variableWeight       Float    @default(1.0)
+  recencyFactor        Float    @default(1.0)
+  contextWeight        Float    @default(1.0)
+  confidenceMultiplier Float    @default(0.75)
+  antiAbuseMultiplier  Float    @default(1.0)
+  effectiveDelta       Float
+  voterUserId          String?
+  voterAimScore        Float?
+  isReversed           Boolean  @default(false)
+  createdAt            DateTime @default(now())
+
+  user      User  @relation("DomainEventOwner", fields: [userId], references: [id], onDelete: Cascade)
+  post      Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+  voterUser User? @relation("DomainEventVoter", fields: [voterUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId, domainName])
+  @@index([postId])
 }

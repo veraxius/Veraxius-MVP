@@ -13,6 +13,7 @@ import postsRouter from "./routes/posts";
 import rankingsRouter from "./routes/rankings";
 import { prisma } from "./config/prisma";
 import { applyDecayToAllUsers, runConsistencyCheck } from "./lib/aimV2";
+import { runDomainDecay, snapshotDomainScores } from "./lib/domainScoreService";
 
 const app = express();
 
@@ -143,12 +144,13 @@ ensureUsersTable().finally(() => {
     const delay = next.getTime() - now.getTime();
     setTimeout(async function run() {
       try { await applyDecayToAllUsers(); } catch (err) { /* eslint-disable-next-line no-console */ console.error("daily decay error", err); }
+      try { await runDomainDecay(); } catch (err) { /* eslint-disable-next-line no-console */ console.error("daily domain decay error", err); }
       scheduleDaily();
     }, delay);
   };
   scheduleDaily();
 
-  // Weekly consistency check on Mondays at 04:00 UTC
+  // Weekly consistency check on Mondays at 04:00 UTC + domain score snapshot
   const scheduleWeekly = () => {
     const now = new Date();
     const next = new Date(now);
@@ -166,6 +168,8 @@ ensureUsersTable().finally(() => {
           try { await runConsistencyCheck(u.id); } catch { /* ignore per-user */ }
         }
       } catch (err) { /* eslint-disable-next-line no-console */ console.error("weekly consistency error", err); }
+      // Snapshot domain scores for 7-day trend calculation
+      try { await snapshotDomainScores(); } catch (err) { /* eslint-disable-next-line no-console */ console.error("weekly domain snapshot error", err); }
       scheduleWeekly();
     }, delay);
   };
