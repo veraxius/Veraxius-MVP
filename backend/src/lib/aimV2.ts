@@ -235,9 +235,10 @@ export async function recordPeerFeedback(params: {
 		},
 	});
 	let flagged = false;
+	let suspicion: "normal" | "mild" | "strong" | "coordinated" = "normal";
 	if (burst >= AIMCFG.peerValidation.coordinationMinVotes && networkDistance === AIMCFG.peerValidation.coordinationNetworkDistance) {
-		voteWeight = voteWeight * (1 - AIMCFG.peerValidation.coordinationPenalty);
 		flagged = true;
+		suspicion = "coordinated";
 		await prisma.aimFlag.create({
 			data: {
 				userId: targetId,
@@ -259,7 +260,7 @@ export async function recordPeerFeedback(params: {
 			weight: voteWeight,
 			domain,
 			contextWeight: 1,
-			metadata: { voterId, networkDistance, diversity, aimVoter, flagged },
+			metadata: { voterId, networkDistance, diversity, aimVoter, flagged, suspicion },
 		},
 	});
 	return { ok: true, delta: finalDelta, flagged };
@@ -270,14 +271,14 @@ export async function openChallenge(challengerId: string, targetId: string, reas
 	const ch = await prisma.aimChallenge.create({
 		data: { challengerId, targetUserId: targetId, reason, severity, status: "pending" },
 	});
-	// provisional penalties for level 1
-	if (severity === 1) {
+		// provisional penalties per level
+		if (severity === 1) {
 		await prisma.aimEvent.create({
 			data: {
 				userId: targetId,
 				eventType: "contradiction",
 				signal: "challenge_opened",
-				delta: AIMCFG.contradiction.level1.provisionalPenalty,
+					delta: AIMCFG.contradiction.level1.provisional,
 				weight: 1,
 				contextWeight: 1,
 				metadata: { challengeId: ch.id, severity },
@@ -300,15 +301,21 @@ export async function resolveChallenge(challengeId: string, resolution: "positiv
 	const targetId = ch.targetUserId;
 	const sev = ch.severity as 1 | 2 | 3;
 	let delta = 0;
-	if (sev === 1) {
-		// reverse provisional if positive, keep if negative
-		delta = resolution === "positive" ? -AIMCFG.contradiction.level1.provisionalPenalty : 0;
-	} else if (sev === 2) {
-		delta = resolution === "negative" ? AIMCFG.contradiction.level2.penalty : 0;
-	} else if (sev === 3) {
-		delta = resolution === "negative" ? AIMCFG.contradiction.level3.penalty : 0;
+	const p = AIMCFG.contradiction;
+	// Determine original provisional
+	const orig = sev === 1 ? p.level1.provisional : sev === 2 ? p.level2.provisional : p.level3.provisional;
+	if (resolution === "negative") {
+		// upheld: keep or deepen slightly
+		delta = orig + (p.resolved.upheld.deepenBy ?? 0);
+	} else if (resolution === "positive") {
+		// dismissed: reverse 100%
+		delta = -orig;
+	} else {
+		// mixed: reverse 30–60% (use midpoint)
+		const pct = (p.resolved.mixed.reversePercentMin + p.resolved.mixed.reversePercentMax) / 2;
+		delta = -orig * pct;
 	}
-	if (delta !== 0) {
+	if (delta) {
 		await prisma.aimEvent.create({
 			data: {
 				userId: targetId,
@@ -444,7 +451,7 @@ export async function recomputeAIMScore(userId: string, domain?: string) {
 	// confidence and rankingScore
 	// Default to 'none' verification; upstream may re-run with richer info
 	const confidenceScore = await calculateConfidence(userId, "none");
-	const rankingScore = aimGlobal * (AIMCFG.confidence.rankingBlend.base + AIMCFG.confidence.rankingBlend.boost * confidenceScore);
+	const rankingScore = aimGlobal * (AIMCFG.rankingBlend.base + AIMCFG.rankingBlend.boost * confidenceScore);
 
 	await prisma.user.update({
 		where: { id: userId },
