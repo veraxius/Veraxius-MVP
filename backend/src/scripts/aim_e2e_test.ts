@@ -117,13 +117,13 @@ async function testContradictionResolution() {
 	const afterOpen = await getAim(user);
 	assertOrThrow(afterOpen < pre, "openChallenge (sev1) should reduce score provisionally");
 	// Resolve positive (dismissed): with current aggregator (abs penalties), do NOT expect increase
-	await resolveChallenge(ch1.id, "positive");
+	await resolveChallenge(ch1.id, "dismissed");
 	await recomputeAIMScore(user);
 	const afterDismiss = await getAim(user);
 	assertOrThrow(afterDismiss <= afterOpen, "dismissed challenge should not increase score with current contradiction aggregation");
 	// Open severity 3 and uphold (negative): expect further decrease and a flag
 	const ch3 = await openChallenge(others[0], user, "severe", 3);
-	await resolveChallenge(ch3.id, "negative");
+	await resolveChallenge(ch3.id, "upheld");
 	await recomputeAIMScore(user);
 	const afterUpheld = await getAim(user);
 	assertOrThrow(afterUpheld <= afterDismiss, "upheld severe challenge should not increase score");

@@ -153,7 +153,7 @@ async function scenario5() {
   await recomputeAIMScore(target);
   await logState("On openChallenge", target);
   // upheld
-  await resolveChallenge(ch.id, "negative");
+  await resolveChallenge(ch.id, "upheld");
   await recomputeAIMScore(target);
   await logState("On upheld resolution", target);
 }
@@ -211,7 +211,7 @@ async function abuse3_challengeHarassment() {
   for (let i = 0; i < 3; i++) {
     const ch = await openChallenge(voters[i], target, "spam", 1);
     // mark malicious accuser on resolve positive
-    await resolveChallenge(ch.id, "positive");
+    await resolveChallenge(ch.id, "dismissed");
     await prisma.aimEvent.create({ data: { userId: voters[i], eventType: "contradiction", signal: "malicious_challenge", delta: -0.03, weight: 1, contextWeight: 1 } });
   }
   await recomputeAIMScore(target);
@@ -246,7 +246,7 @@ async function abuse6_quietLaundering() {
   const { target, voters } = await setupUsers("ab6", 1);
   await resetUserData(target);
   const ch = await openChallenge(voters[0], target, "maj", 3);
-  await resolveChallenge(ch.id, "negative"); // upheld
+  await resolveChallenge(ch.id, "upheld");
   await recomputeAIMScore(target);
   for (let i = 0; i < 10; i++) {
     await recordOutcome(target, `ab6-clean-${i}`, 0.9, "system", "general", { platformVerification: "verified" });
