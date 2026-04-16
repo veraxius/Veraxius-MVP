@@ -216,14 +216,6 @@ export async function runConsistencyCheck(userId: string) {
 	const sevenDaysAgo  = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000);
 	const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-	const recentEvents   = await prisma.aimEvent.findMany({ where: { userId, createdAt: { gte: sevenDaysAgo } } });
-	const baselineEvents = await prisma.aimEvent.findMany({ where: { userId, createdAt: { gte: thirtyDaysAgo, lt: sevenDaysAgo } } });
-
-	// Latency proxy — placeholder; improve with real activity timestamps if available
-	const recentLatency   = 1 + recentEvents.length   ? 1 : 1;
-	const baselineLatency = 1 + baselineEvents.length  ? 1 : 1;
-	const latencyDev = baselineLatency > 0 ? Math.abs(recentLatency - baselineLatency) / baselineLatency : 0;
-
 	const recentPosts   = await prisma.post.count({ where: { userId, createdAt: { gte: sevenDaysAgo } } });
 	const baselinePosts = await prisma.post.count({ where: { userId, createdAt: { gte: thirtyDaysAgo, lt: sevenDaysAgo } } });
 	const postFreqDev   = baselinePosts > 0 ? (baselinePosts - recentPosts) / baselinePosts : 0;
@@ -241,8 +233,6 @@ export async function runConsistencyCheck(userId: string) {
 
 	let breaks  = 0;
 	let matches = 0;
-	if (latencyDev > 0.5)       breaks  += 1;
-	if (latencyDev < 0.15)      matches += 1;
 	if (postFreqDev > 0.7)      breaks  += 1;
 	if (votePatternDev > 0.4)   breaks  += 1;
 	if (primary && !hasPrimaryActivity) breaks  += 1;
@@ -250,16 +240,14 @@ export async function runConsistencyCheck(userId: string) {
 
 	await prisma.aimConsistency.upsert({
 		where:  { userId },
-		update: { breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
-		create: { userId, breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
+		update: { breakCount: breaks, matchCount: matches, lastSnapshot: { postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
+		create: { userId, breakCount: breaks, matchCount: matches, lastSnapshot: { postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
 	});
 
 	type EventData = Parameters<typeof prisma.aimEvent.create>[0]["data"];
 	const events: EventData[] = [];
 	const cfg = AIMCFG.consistency;
 
-	if (latencyDev > 0.5)    events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyA, weight: 1, contextWeight: 1, metadata: { kind: "latency_deviation",     value: latencyDev } });
-	if (latencyDev < 0.15)   events.push({ userId, eventType: "consistency", signal: "consistency_match", delta: cfg.matchBonusA,   weight: 1, contextWeight: 1, metadata: { kind: "latency_deviation",     value: latencyDev } });
 	if (postFreqDev > 0.7)   events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyB, weight: 1, contextWeight: 1, metadata: { kind: "post_frequency_drop",   value: postFreqDev } });
 	if (votePatternDev > 0.4) events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyC, weight: 1, contextWeight: 1, metadata: { kind: "vote_pattern_change",   value: votePatternDev } });
 	if (primary && !hasPrimaryActivity) events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyD, weight: 1, contextWeight: 1, metadata: { kind: "claim_action_alignment", primary } });
@@ -321,9 +309,9 @@ export async function recordPeerFeedback(params: {
 	// ── Burst/Coordination Detection ─────────────────────────────────────────
 	// Count all peer_validation events the target received in the coordination window
 	const coordWindowStart = new Date(now.getTime() - AIMCFG.peerValidation.coordinationWindowHours * 60 * 60 * 1000);
-	const burstCount = await prisma.aimEvent.count({
-		where: { userId: targetId, eventType: "peer_validation", createdAt: { gte: coordWindowStart } },
-	});
+	const burstCount = (await prisma.aimEvent.count({
+	where: { userId: targetId, eventType: "peer_validation", createdAt: { gte: coordWindowStart } },
+    })) + 1;
 
 	let suspicion: "normal" | "mild" | "strong" | "coordinated" = "normal";
 	const thresholds = AIMCFG.peerValidation.coordinationBurst;
