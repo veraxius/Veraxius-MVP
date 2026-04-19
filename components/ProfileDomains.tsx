@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { getToken } from "@/lib/auth";
+import { aimFractionToPercent } from "@/lib/aimDisplay";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -117,14 +119,25 @@ function AnimatedBar({ pct, color }: { pct: number; color: string }) {
 
 // ─── Single Domain Row ────────────────────────────────────────────────────────
 
+function slugifyDomain(name: string): string {
+	const base = name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+	return base || "domain";
+}
+
 function DomainRow({
+	userId,
 	domain,
 	isLast,
 }: {
+	userId: string;
 	domain: DomainScore;
 	isLast: boolean;
 }) {
 	const score = domain.domain_aim_score;           // raw 0–1 value
+	const displayPct = aimFractionToPercent(score);
 
 	// Bar fills from 0% (score = 0.50, neutral start) to 100% (score = 1.00, max trust).
 	// Scores below 0.50 (net negative votes) keep the bar at 0%.
@@ -132,12 +145,16 @@ function DomainRow({
 
 	// Colour uses the full display_percentage scale so neutral (0.50) shows amber/yellow
 	// and clearly positive scores shift to green.
-	const barColor = getBarColorStyle(domain.display_percentage);
+	const barColor = getBarColorStyle(aimFractionToPercent(score));
 	const icon = DOMAIN_ICONS[domain.domain_name] ?? "📌";
+	const anchorId = `domain-${slugifyDomain(domain.domain_name)}`;
 
 	return (
-		<div
-			className={`px-5 py-4 flex flex-col gap-2.5 ${
+		<Link
+			href={`/profile/${userId}#${anchorId}`}
+			id={anchorId}
+			scroll={false}
+			className={`block px-5 py-4 flex flex-col gap-2.5 transition-colors hover:bg-white/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-amber/50 rounded-none ${
 				!isLast ? "border-b border-vx-divider" : ""
 			}`}
 		>
@@ -170,7 +187,7 @@ function DomainRow({
 					className="text-2xl font-bold leading-none tabular-nums w-20 shrink-0"
 					style={{ color: barColor }}
 				>
-					{score.toFixed(2)}%
+					{displayPct.toFixed(1)}%
 				</span>
 				<div className="flex-1 flex flex-col gap-1">
 					<AnimatedBar pct={barPct} color={barColor} />
@@ -180,7 +197,7 @@ function DomainRow({
 					</div>
 				</div>
 			</div>
-		</div>
+		</Link>
 	);
 }
 
@@ -318,7 +335,7 @@ export default function ProfileDomains({
 	const hasMore = publicDomains.length > MAX_VISIBLE;
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-4" id="profile-domains">
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<h2 className="text-xl font-semibold">Domains</h2>
@@ -338,6 +355,7 @@ export default function ProfileDomains({
 					{visibleDomains.map((d, idx) => (
 						<DomainRow
 							key={d.domain_name}
+							userId={userId}
 							domain={d}
 							isLast={idx === visibleDomains.length - 1}
 						/>

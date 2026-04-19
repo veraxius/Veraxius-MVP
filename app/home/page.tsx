@@ -7,6 +7,7 @@ import { ConversationList } from "@/components/ConversationList";
 import { ChatWindow } from "@/components/ChatWindow";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { notifyAimRefresh } from "@/lib/aimEvents";
 
 type Post = {
   id: number;
@@ -90,6 +91,7 @@ export default function HomePage() {
       const data = await resp.json();
       if (resp.ok) {
         setPosts((p) => p.map((x) => x.id === optimistic.id ? data : x));
+        notifyAimRefresh();
       } else {
         setPosts((p) => p.filter((x) => x.id !== optimistic.id));
         setError(data?.error || "Failed to post");
@@ -120,6 +122,7 @@ export default function HomePage() {
         body: JSON.stringify({ type })
       });
       loadPosts();
+      notifyAimRefresh();
     } catch {/* ignore */}
   }
 
@@ -142,6 +145,7 @@ export default function HomePage() {
         body: JSON.stringify({ content: text.trim() })
       });
       loadPosts();
+      notifyAimRefresh();
     } catch {/* ignore */}
   }
 
