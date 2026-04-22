@@ -6,21 +6,33 @@ import { prisma } from "../config/prisma";
 
 const router = Router();
 
+const ACCESS_TOKEN_EXPIRY = "1h";
+const REFRESH_TOKEN_EXPIRY = "7d";
+
+function signAccessToken(userId: string) {
+  const secret = process.env.JWT_SECRET!;
+  return jwt.sign({ sub: userId, type: "access" }, secret, {
+    expiresIn: ACCESS_TOKEN_EXPIRY,
+  });
+}
+
+function signRefreshToken(userId: string) {
+  const secret = process.env.JWT_SECRET!;
+  return jwt.sign({ sub: userId, type: "refresh" }, secret, {
+    expiresIn: REFRESH_TOKEN_EXPIRY,
+  });
+}
+
 const RegisterSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(1).max(80).optional(),
 });
 
-const LoginSchema = RegisterSchema;
-
-function signToken(userId: string) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET not set");
-  }
-  return jwt.sign({ sub: userId }, secret, { expiresIn: "15d" });
-}
+const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
 
 router.post("/register", async (req, res) => {
   try {
@@ -43,10 +55,16 @@ router.post("/register", async (req, res) => {
       select: { id: true, email: true, name: true, created_at: true },
     });
 
-    const token = signToken(user.id);
-    return res.status(201).json({ token, user });
+    const access_token = signAccessToken(user.id);
+    const refresh_token = signRefreshToken(user.id);
+
+    return res.status(201).json({
+      access_token,
+      refresh_token,
+      token_type: "Bearer",
+      user,
+    });
   } catch (err: any) {
-    // eslint-disable-next-line no-console
     console.error("Register error:", err);
     return res.status(500).json({ error: err?.message || "Internal server error" });
   }
@@ -70,16 +88,49 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const token = signToken(user.id);
+    const access_token = signAccessToken(user.id);
+    const refresh_token = signRefreshToken(user.id);
+
     return res.status(200).json({
-      token,
+      access_token,
+      refresh_token,
+      token_type: "Bearer",
       user: { id: user.id, email: user.email, name: user.name, created_at: user.created_at },
     });
   } catch (err: any) {
-    // eslint-disable-next-line no-console
     console.error("Login error:", err);
     return res.status(500).json({ error: err?.message || "Internal server error" });
   }
+});
+
+router.post("/refresh", (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+
+    if (!refresh_token) {
+      return res.status(400).json({ error: "Missing refresh token" });
+    }
+
+    const secret = process.env.JWT_SECRET!;
+    const payload = jwt.verify(refresh_token, secret) as any;
+
+    if (payload.type !== "refresh") {
+      return res.status(401).json({ error: "Invalid token type" });
+    }
+
+    const newAccessToken = signAccessToken(payload.sub);
+
+    return res.status(200).json({
+      access_token: newAccessToken,
+      token_type: "Bearer",
+    });
+  } catch (err: any) {
+    return res.status(401).json({ error: err?.message || "Invalid refresh token" });
+  }
+});
+
+router.post("/logout", (_req, res) => {
+  return res.status(200).json({ message: "Logged out successfully" });
 });
 
 export default router;
