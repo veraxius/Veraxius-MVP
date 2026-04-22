@@ -11,9 +11,11 @@ import usersRouter from "./routes/users";
 import aimRouter from "./routes/aim";
 import postsRouter from "./routes/posts";
 import rankingsRouter from "./routes/rankings";
+import eventsRouter from "./routes/events";
 import { prisma } from "./config/prisma";
 import { applyDecayToAllUsers, runConsistencyCheck } from "./lib/aimV2";
 import { runDomainDecay, snapshotDomainScores } from "./lib/domainScoreService";
+import { processPendingEvents } from "./lib/eventProcessor";
 
 const app = express();
 
@@ -35,6 +37,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/aim", aimRouter);
 app.use("/api/posts", postsRouter);
 app.use("/api/rankings", rankingsRouter);
+app.use("/api/events", eventsRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
@@ -86,7 +89,7 @@ io.on("connection", (socket) => {
       const part = await prisma.conversationParticipant.findFirst({
         where: { conversationId, userId }
       });
-      if (!part) return; // silently ignore or emit error
+      if (!part) return;
 
       const message = await prisma.message.create({
         data: {
@@ -134,6 +137,14 @@ ensureUsersTable().finally(() => {
     console.log(`API listening on port ${PORT}`);
   });
 
+  // Process pending events on a short interval
+  setInterval(() => {
+    processPendingEvents().catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error("event processor interval error", err);
+    });
+  }, 5000);
+
   // Schedulers (non-blocking, simple timers)
   // Daily decay at 03:00 UTC
   const scheduleDaily = () => {
@@ -143,8 +154,8 @@ ensureUsersTable().finally(() => {
     if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
     const delay = next.getTime() - now.getTime();
     setTimeout(async function run() {
-      try { await applyDecayToAllUsers(); } catch (err) { /* eslint-disable-next-line no-console */ console.error("daily decay error", err); }
-      try { await runDomainDecay(); } catch (err) { /* eslint-disable-next-line no-console */ console.error("daily domain decay error", err); }
+      try { await applyDecayToAllUsers(); } catch (err) { console.error("daily decay error", err); }
+      try { await runDomainDecay(); } catch (err) { console.error("daily domain decay error", err); }
       scheduleDaily();
     }, delay);
   };
@@ -154,7 +165,6 @@ ensureUsersTable().finally(() => {
   const scheduleWeekly = () => {
     const now = new Date();
     const next = new Date(now);
-    // 1 = Monday in ISO
     const day = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
     const daysUntilMonday = (8 - day) % 7;
     next.setUTCDate(now.getUTCDate() + daysUntilMonday);
@@ -167,9 +177,9 @@ ensureUsersTable().finally(() => {
         for (const u of users) {
           try { await runConsistencyCheck(u.id); } catch { /* ignore per-user */ }
         }
-      } catch (err) { /* eslint-disable-next-line no-console */ console.error("weekly consistency error", err); }
-      // Snapshot domain scores for 7-day trend calculation
-      try { await snapshotDomainScores(); } catch (err) { /* eslint-disable-next-line no-console */ console.error("weekly domain snapshot error", err); }
+      } catch (err) { console.error("weekly consistency error", err); }
+
+      try { await snapshotDomainScores(); } catch (err) { console.error("weekly domain snapshot error", err); }
       scheduleWeekly();
     }, delay);
   };
