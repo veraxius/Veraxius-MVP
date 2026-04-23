@@ -16,11 +16,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 		const token = header.slice("Bearer ".length);
 		const secret = process.env.JWT_SECRET;
 		if (!secret) return res.status(500).json({ error: "JWT secret not configured" });
+
 		const payload = jwt.verify(token, secret) as any;
+
+		if (payload.type !== "access") {
+			return res.status(401).json({ error: "Invalid token type" });
+		}
+
 		req.userId = payload.sub as string;
 		return next();
 	} catch (err: any) {
-		// eslint-disable-next-line no-console
 		console.error("Auth middleware error:", err);
 		return res.status(401).json({ error: "Invalid token" });
 	}
