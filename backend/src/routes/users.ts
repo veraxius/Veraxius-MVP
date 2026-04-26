@@ -2,8 +2,19 @@ import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
 import { extractUserIdFromBearer } from "../lib/domainScoreService";
+import { AIMEngine } from "../lib/aimEngine";
 
 const router = Router();
+
+const aimEngine = new AIMEngine();
+
+function riskLevelFromFraction(fraction: number): "low" | "moderate" | "high" | "critical" {
+	const pct = fraction > 1 ? fraction : fraction * 100;
+	if (pct >= 76) return "low";
+	if (pct >= 51) return "moderate";
+	if (pct >= 26) return "high";
+	return "critical";
+}
 
 // GET /api/users/search?q=  — protected
 router.get("/search", requireAuth, async (req, res) => {
@@ -23,6 +34,91 @@ router.get("/search", requireAuth, async (req, res) => {
 	} catch (err: any) {
 		// eslint-disable-next-line no-console
 		console.error("User search error:", err);
+		return res.status(500).json({ error: err?.message || "Internal server error" });
+	}
+});
+
+/**
+ * GET /api/users/:userId/aim-summary
+ * MVP4-shaped summary for dashboard / hero card (frontend maps from FastAPI-style naming).
+ */
+router.get("/:userId/aim-summary", async (req, res) => {
+	try {
+		const { userId } = req.params as { userId: string };
+
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+			select: {
+				id: true,
+				email: true,
+				aimScore: true,
+				aimStatus: true,
+				aimConfidence: true,
+				created_at: true,
+			},
+		});
+		if (!user) return res.status(404).json({ error: "User not found" });
+
+		const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+		const history30 = await prisma.aimScoreHistory.findMany({
+			where: { userId, createdAt: { gte: thirtyDaysAgo } },
+			orderBy: { createdAt: "asc" },
+			select: { score: true, createdAt: true },
+		});
+
+		const fraction = Number(user.aimScore);
+		const global_score = Math.round(fraction * 1000) / 10;
+
+		const confRaw = user.aimConfidence != null ? Number(user.aimConfidence) : null;
+		const confidence_score =
+			confRaw != null
+				? Math.round(confRaw * 1000) / 10
+				: Math.round(Math.min(100, fraction * 100) * 10) / 10;
+
+		let score_trend_30d: "up" | "down" | "flat" = "flat";
+		let trend_delta_30d = 0;
+		if (history30.length >= 2) {
+			const first = history30[0].score;
+			const last = history30[history30.length - 1].score;
+			trend_delta_30d = Math.round((last - first) * 10000) / 10000;
+			if (trend_delta_30d > 0.005) score_trend_30d = "up";
+			else if (trend_delta_30d < -0.005) score_trend_30d = "down";
+		}
+
+		const risk_level = riskLevelFromFraction(fraction);
+
+		const { activity } = await aimEngine.getSummary(userId);
+		const top_drivers = activity.slice(0, 10).map((a) => ({
+			id: a.id,
+			label: a.label,
+			delta: a.delta,
+			impact: (a.delta >= 0 ? "positive" : "negative") as "positive" | "negative",
+			delta_label: a.deltaLabel,
+			domain: a.domain ?? null,
+			created_at: a.createdAt,
+		}));
+
+		res.json({
+			user: {
+				id: user.id,
+				email: user.email,
+				created_at: user.created_at,
+			},
+			global_score,
+			confidence_score,
+			risk_level,
+			aim_status: user.aimStatus,
+			score_trend_30d,
+			trend_delta_30d,
+			top_drivers,
+			history_30d: history30.map((h) => ({
+				score: h.score,
+				created_at: h.createdAt.toISOString(),
+			})),
+		});
+	} catch (err: any) {
+		// eslint-disable-next-line no-console
+		console.error("GET /api/users/:userId/aim-summary error", err);
 		return res.status(500).json({ error: err?.message || "Internal server error" });
 	}
 });
