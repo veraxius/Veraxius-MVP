@@ -58,12 +58,13 @@ router.post("/register", async (req, res) => {
     const access_token = signAccessToken(user.id);
     const refresh_token = signRefreshToken(user.id);
 
-    return res.status(201).json({
-      access_token,
-      refresh_token,
-      token_type: "Bearer",
-      user,
-    });
+   return res.status(201).json({
+  access_token,
+  token: access_token,
+  refresh_token,
+  token_type: "Bearer",
+  user,
+});
   } catch (err: any) {
     console.error("Register error:", err);
     return res.status(500).json({ error: err?.message || "Internal server error" });
@@ -92,11 +93,13 @@ router.post("/login", async (req, res) => {
     const refresh_token = signRefreshToken(user.id);
 
     return res.status(200).json({
-      access_token,
-      refresh_token,
-      token_type: "Bearer",
-      user: { id: user.id, email: user.email, name: user.name, created_at: user.created_at },
-    });
+  access_token,
+  token: access_token,
+  refresh_token,
+  token_type: "Bearer",
+  user: { id: user.id, email: user.email, name: user.name, created_at: user.created_at },
+});
+
   } catch (err: any) {
     console.error("Login error:", err);
     return res.status(500).json({ error: err?.message || "Internal server error" });
@@ -121,9 +124,10 @@ router.post("/refresh", (req, res) => {
     const newAccessToken = signAccessToken(payload.sub);
 
     return res.status(200).json({
-      access_token: newAccessToken,
-      token_type: "Bearer",
-    });
+  access_token: newAccessToken,
+  token: newAccessToken,
+  token_type: "Bearer",
+});
   } catch (err: any) {
     return res.status(401).json({ error: err?.message || "Invalid refresh token" });
   }

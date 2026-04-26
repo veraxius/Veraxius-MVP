@@ -29,7 +29,13 @@ export default function LoginPage() {
       if (!res.ok) {
         throw new Error(data?.error || "Login failed");
       }
-      saveAuth(data.token, data.user);
+      const token = data.token || data.access_token;
+
+if (!token) {
+  throw new Error("Login succeeded but no token was returned");
+}
+
+saveAuth(token, data.user);
       router.push("/home");
     } catch (err: any) {
       setError(err?.message || "Unexpected error");
