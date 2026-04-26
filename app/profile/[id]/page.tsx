@@ -26,9 +26,22 @@ type ActivityItem = {
 	createdAt: string;
 };
 
+type Challenge = {
+	id: string;
+	targetUserId: string;
+	challengerId: string;
+	reason: string;
+	severity: number;
+	status: string;
+	resolution?: string | null;
+	impact?: number | null;
+	createdAt: string;
+};
+
 export default function ProfilePage() {
 	const params = useParams<{ id: string }>();
 	const userId = params.id;
+
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [history, setHistory] = useState<AimScoreHistory[]>([]);
@@ -49,6 +62,44 @@ export default function ProfilePage() {
 			setError(e instanceof Error ? e.message : "Unknown error");
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	async function loadChallengeStats() {
+		if (!userId) return;
+
+		try {
+			setChallengeLoading(true);
+
+			const res = await fetch(`http://localhost:3001/api/aim/challenges/${userId}`, {
+				cache: "no-store",
+			});
+
+			const data = await res.json();
+			const challenges = getCleanChallenges(data);
+
+			const open = challenges.filter((c) =>
+				["pending", "under_review"].includes((c.status || "").toLowerCase())
+			).length;
+
+			const resolved = challenges.filter((c) =>
+				["resolved", "dismissed", "rejected", "upheld", "malicious", "mixed"].includes(
+					(c.status || "").toLowerCase()
+				)
+			).length;
+
+			setOpenCount(open);
+			setResolvedCount(resolved);
+			setTotalCount(challenges.length);
+			setDisplayStatus(computeStatus(challenges));
+		} catch (e) {
+			console.error("Failed to load challenge stats", e);
+			setOpenCount(0);
+			setResolvedCount(0);
+			setTotalCount(0);
+			setDisplayStatus("Stable");
+		} finally {
+			setChallengeLoading(false);
 		}
 	}
 
@@ -87,6 +138,7 @@ export default function ProfilePage() {
 								here.
 							</div>
 						)}
+
 						{activity.map((item) => (
 							<ActivityRow key={item.id} item={item} />
 						))}
@@ -99,6 +151,7 @@ export default function ProfilePage() {
 						{history.length === 0 && !loading && (
 							<div className="p-5 text-sm text-vx-text-secondary">No history</div>
 						)}
+
 						{history.map((h) => (
 							<div key={h.id} className="px-5 py-3 flex items-center justify-between gap-4">
 								<div className="space-y-0.5">
@@ -147,13 +200,16 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 						{sourceLabel}
 					</span>
 				</div>
+
 				{item.sublabel && (
 					<div className="text-xs text-vx-text-secondary">{item.sublabel}</div>
 				)}
+
 				<div className="text-xs text-vx-text-tertiary">
 					{new Date(item.createdAt).toLocaleString()}
 				</div>
 			</div>
+
 			<div className={`font-semibold tabular-nums text-sm shrink-0 ${deltaColor}`}>
 				{item.deltaLabel}
 			</div>

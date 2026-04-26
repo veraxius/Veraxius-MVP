@@ -266,3 +266,13 @@ model DomainAimEvent {
   @@index([userId, domainName])
   @@index([postId])
 }
+
+model Event {
+  id        Int      @id @default(autoincrement())
+  type      String
+  userId    String?
+  payload   Json
+  status    String   @default("pending")
+  error     String?
+  createdAt DateTime @default(now())
+}
