@@ -7,6 +7,7 @@ import { ConversationList } from "@/components/ConversationList";
 import { ChatWindow } from "@/components/ChatWindow";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { notifyAimRefresh } from "@/lib/aimEvents";
 
 type ReactionType = "confiable" | "not_reliable";
 
