@@ -8,6 +8,8 @@ import { ChatWindow } from "@/components/ChatWindow";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
+type ReactionType = "confiable" | "not_reliable";
+
 type Post = {
   id: number;
   userId: string;
@@ -59,90 +61,106 @@ export default function HomePage() {
     const h = hues[Math.abs(hashCode(name)) % hues.length];
     return `hsl(${h} 60% 35%)`;
   }
+
   function hashCode(s: string) {
     let h = 0;
-    for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+    }
     return h;
   }
 
   async function submitPost() {
     const text = compose.trim();
     if (!text) return;
-    const optimistic: Post = {
-      id: -(Date.now() % 100000),
-      userId: me?.id || "me",
-      userName: me?.name || me?.email?.split("@")[0] || "me",
-      userVerified: false,
-      content: text,
-      createdAt: new Date().toISOString(),
-      reactions: [],
-      comments: []
-    };
-    setPosts((p) => [optimistic, ...p]);
-    setCompose("");
+
+    const auth = getAuth();
+    if (!auth?.token) {
+      setError("Please login again");
+      return;
+    }
+
     try {
-      const auth = getAuth();
+      setError(null);
+
       const resp = await fetch(`${API_URL}/api/posts`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: auth?.token ? `Bearer ${auth.token}` : "" },
-        body: JSON.stringify({ content: text })
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ content: text }),
       });
+
       const data = await resp.json();
-      if (resp.ok) {
-        setPosts((p) => p.map((x) => x.id === optimistic.id ? data : x));
-      } else {
-        setPosts((p) => p.filter((x) => x.id !== optimistic.id));
-        setError(data?.error || "Failed to post");
-      }
+      if (!resp.ok) throw new Error(data?.error || "Failed to post");
+
+      setCompose("");
+      await loadPosts();
     } catch (e: any) {
-      setPosts((p) => p.filter((x) => x.id !== optimistic.id));
       setError(e?.message || "Failed to post");
     }
   }
 
-  async function toggleReaction(postId: number, type: "util" | "confiable" | "not_reliable") {
+  async function toggleReaction(postId: number, type: ReactionType) {
     const auth = getAuth();
-    if (!auth?.user?.id) return;
-    const mine = (p: Post) => (p.reactions ?? []).some(r => r.userId === auth.user.id && r.type === type);
-    setPosts((p) => p.map(post => {
-      if (post.id !== postId) return post;
-      const has = mine(post);
-      return {
-        ...post,
-        reactions: has ? (post.reactions ?? []).filter(r => !(r.userId === auth.user.id && r.type === type))
-                       : [...(post.reactions ?? []), { id: -(Date.now()%1e6), postId, userId: auth.user.id, type }]
-      };
-    }));
+
+    if (!auth?.token || !auth?.user?.id) {
+      setError("Please login again");
+      return;
+    }
+
     try {
-      await fetch(`${API_URL}/api/posts/${postId}/react`, {
+      setError(null);
+
+      const resp = await fetch(`${API_URL}/api/posts/${postId}/react`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: auth?.token ? `Bearer ${auth.token}` : "" },
-        body: JSON.stringify({ type })
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ type }),
       });
-      loadPosts();
-    } catch {/* ignore */}
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "Reaction failed");
+
+      await loadPosts();
+    } catch (e: any) {
+      setError(e?.message || "Reaction failed");
+    }
   }
 
   async function addComment(postId: number, text: string) {
     const auth = getAuth();
-    if (!auth?.user?.id || !text.trim()) return;
-    const optimistic = {
-      id: -(Date.now()%1e6),
-      postId,
-      userId: auth.user.id,
-      userName: auth.user.name || auth.user.email?.split("@")[0] || "me",
-      content: text.trim(),
-      createdAt: new Date().toISOString()
-    };
-    setPosts((p) => p.map(post => post.id === postId ? { ...post, comments: [...post.comments, optimistic] } : post));
+
+    if (!auth?.token || !auth?.user?.id) {
+      setError("Please login again");
+      return;
+    }
+
+    const cleanText = text.trim();
+    if (!cleanText) return;
+
     try {
-      await fetch(`${API_URL}/api/posts/${postId}/comments`, {
+      setError(null);
+
+      const resp = await fetch(`${API_URL}/api/posts/${postId}/comments`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: auth?.token ? `Bearer ${auth.token}` : "" },
-        body: JSON.stringify({ content: text.trim() })
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ content: cleanText }),
       });
-      loadPosts();
-    } catch {/* ignore */}
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "Comment failed");
+
+      await loadPosts();
+    } catch (e: any) {
+      setError(e?.message || "Comment failed");
+    }
   }
 
   return (
@@ -151,13 +169,13 @@ export default function HomePage() {
       style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
     >
       <div className="mx-auto w-full max-w-vx-content">
-        {/* Top bar actions (messages opener is already in global navbar, keep a secondary subtle button here) */}
         <div className="mb-6 flex items-center justify-between">
-          <div className="vx-eyebrow-with-line"><span className="vx-eyebrow">Veraxius</span></div>
+          <div className="vx-eyebrow-with-line">
+            <span className="vx-eyebrow">Veraxius</span>
+          </div>
           <div />
         </div>
 
-        {/* Compose */}
         <section className="mb-8 rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4">
           <div className="flex items-start gap-3">
             <div
@@ -166,6 +184,7 @@ export default function HomePage() {
             >
               {initials(me?.email?.split("@")[0] || "ME")}
             </div>
+
             <div className="flex-1">
               <textarea
                 value={compose}
@@ -178,34 +197,44 @@ export default function HomePage() {
                 )}
                 rows={3}
               />
+
               <div className="mt-2 flex justify-end">
-                <button onClick={submitPost} className="vx-btn-primary rounded-lg px-5">POST</button>
+                <button onClick={submitPost} className="vx-btn-primary rounded-lg px-5">
+                  POST
+                </button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Feed */}
         <section className="space-y-4">
           {loading && <div className="text-secondary">Cargando…</div>}
           {error && <div className="text-red">{error}</div>}
-          {!loading && posts.map((p) => <PostCard key={p.id} post={p} onReact={toggleReaction} onComment={addComment} />)}
-        </section>
 
-        {/* Marketplace removed as requested */}
+          {!loading &&
+            posts.map((p) => (
+              <PostCard key={p.id} post={p} onReact={toggleReaction} onComment={addComment} />
+            ))}
+        </section>
       </div>
 
-      {/* Floating Messages Panel */}
       {openMessages && (
         <div className="fixed inset-0 z-50" onClick={() => setOpenMessages(false)}>
           <div className="absolute inset-0 bg-black/30" />
-          <div className="absolute right-4 top-16 w-[min(100%,380px)] h-[70vh] rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+
+          <div
+            className="absolute right-4 top-16 w-[min(100%,380px)] h-[70vh] rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             {!activeConversationId ? (
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b border-[var(--divider)] flex items-center justify-between">
                   <div className="vx-mono text-sm">Mensajes</div>
-                  <button onClick={() => setOpenMessages(false)} className="text-secondary text-sm">Cerrar</button>
+                  <button onClick={() => setOpenMessages(false)} className="text-secondary text-sm">
+                    Cerrar
+                  </button>
                 </div>
+
                 <div className="flex-1 overflow-y-auto">
                   <ConversationList activeId={null} onSelect={(id) => setActiveConversationId(id)} refreshToken={0} />
                 </div>
@@ -213,8 +242,11 @@ export default function HomePage() {
             ) : (
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b border-[var(--divider)] flex items-center gap-2">
-                  <button className="text-sm" onClick={() => setActiveConversationId(null)}>← Volver</button>
+                  <button className="text-sm" onClick={() => setActiveConversationId(null)}>
+                    ← Volver
+                  </button>
                 </div>
+
                 <div className="flex-1">
                   <ChatWindow conversationId={activeConversationId} />
                 </div>
@@ -227,23 +259,47 @@ export default function HomePage() {
   );
 }
 
-function PostCard({ post, onReact, onComment }: { post: Post; onReact: (id: number, t: "util"|"confiable"|"not_reliable") => void; onComment: (id: number, text: string) => void }) {
+function PostCard({
+  post,
+  onReact,
+  onComment,
+}: {
+  post: Post;
+  onReact: (id: number, t: ReactionType) => void;
+  onComment: (id: number, text: string) => void;
+}) {
   const [showComments, setShowComments] = useState(false);
   const [text, setText] = useState("");
+
   const me = getAuth()?.user;
   const reactions = post.reactions ?? [];
   const comments = post.comments ?? [];
-  const reactedUtil = !!reactions.find(r => r.userId === me?.id && r.type === "util");
-  const reactedConf = !!reactions.find(r => r.userId === me?.id && r.type === "confiable");
-  const reactedNotRel = !!reactions.find(r => r.userId === me?.id && r.type === "not_reliable");
+
+  const reliableCount = reactions.filter(
+    (r) => r.type === "reliable" || r.type === "confiable"
+  ).length;
+
+  const notReliableCount = reactions.filter(
+    (r) => r.type === "not_reliable"
+  ).length;
+
+  const reactedReliable = reactions.some(
+    (r) => r.userId === me?.id && (r.type === "reliable" || r.type === "confiable")
+  );
+
+  const reactedNotReliable = reactions.some(
+    (r) => r.userId === me?.id && r.type === "not_reliable"
+  );
 
   function relTime(iso: string) {
     const d = new Date(iso).getTime();
     const diff = (Date.now() - d) / 1000;
+
     if (diff < 60) return "ahora";
-    if (diff < 3600) return `${Math.floor(diff/60)}min`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h`;
-    return `${Math.floor(diff/86400)}d`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}min`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+
+    return `${Math.floor(diff / 86400)}d`;
   }
 
   function initials(name: string) {
@@ -252,15 +308,27 @@ function PostCard({ post, onReact, onComment }: { post: Post; onReact: (id: numb
     const second = parts[1]?.[0] ?? "";
     return (first + second).toUpperCase() || name.slice(0, 2).toUpperCase();
   }
+
   function nameColor(name: string) {
     const hues = [18, 32, 140, 200, 260];
     const h = hues[Math.abs(hashCode(name)) % hues.length];
     return `hsl(${h} 60% 35%)`;
   }
+
   function hashCode(s: string) {
     let h = 0;
-    for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+    }
     return h;
+  }
+
+  async function handleCommentSubmit() {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+
+    await onComment(post.id, cleanText);
+    setText("");
   }
 
   return (
@@ -274,48 +342,66 @@ function PostCard({ post, onReact, onComment }: { post: Post; onReact: (id: numb
             {initials(post.userName)}
           </div>
         </Link>
+
         <div className="flex-1">
           <div className="flex items-center gap-2 text-sm">
             <Link href={`/profile/${post.userId}`} className="font-semibold hover:underline">
               {post.userName}
             </Link>
-            {post.userVerified && <span className="px-1.5 py-0.5 text-amber border border-amber rounded">verificado</span>}
+
+            {post.userVerified && (
+              <span className="px-1.5 py-0.5 text-amber border border-amber rounded">
+                verificado
+              </span>
+            )}
+
             <span className="text-tertiary">· {relTime(post.createdAt)}</span>
           </div>
-          <div className="mt-2 vx-body-sm text-primary whitespace-pre-wrap">{post.content}</div>
+
+          <div className="mt-2 vx-body-sm text-primary whitespace-pre-wrap">
+            {post.content}
+          </div>
 
           <div className="mt-3 flex items-center gap-3 text-sm">
             <button
+              type="button"
               className="px-2 py-1 rounded border border-[var(--divider)] text-secondary hover:bg-white/5"
               onClick={() => setShowComments((v) => !v)}
             >
               {comments.length > 0 ? "Answers" : "Reply"} {comments.length}
             </button>
+
             <button
-              className={cn("px-2 py-1 rounded border", reactedConf ? "bg-[var(--amber)] text-[var(--bg-primary)] border-[var(--amber)]" : "border-[var(--divider)] text-secondary hover:bg-white/5")}
-              onClick={() => onReact(post.id, "confiable")}
-            >
-              Reliable {reactions.filter(r => r.type === "confiable").length}
-            </button>
-            <button
+              type="button"
               className={cn(
                 "px-2 py-1 rounded border",
-                reactedNotRel ? "bg-[var(--red)] text-[var(--bg-primary)] border-[var(--red)]" : "border-[var(--divider)] text-secondary hover:bg-white/5"
+                reactedReliable
+                  ? "bg-[var(--amber)] text-[var(--bg-primary)] border-[var(--amber)]"
+                  : "border-[var(--divider)] text-secondary hover:bg-white/5"
               )}
-              onClick={() => {
-                if (reactedConf) onReact(post.id, "confiable"); // remove reliable if set
-                onReact(post.id, "not_reliable");
-              }}
-              title="Toggle not reliable"
+              onClick={() => onReact(post.id, "confiable")}
             >
-              Not reliable {reactions.filter(r => r.type === "not_reliable").length}
+              Reliable {reliableCount}
+            </button>
+
+            <button
+              type="button"
+              className={cn(
+                "px-2 py-1 rounded border",
+                reactedNotReliable
+                  ? "bg-[var(--red)] text-[var(--bg-primary)] border-[var(--red)]"
+                  : "border-[var(--divider)] text-secondary hover:bg-white/5"
+              )}
+              onClick={() => onReact(post.id, "not_reliable")}
+            >
+              Not reliable {notReliableCount}
             </button>
           </div>
 
           {showComments && (
             <div className="mt-3 space-y-3">
               <div className="space-y-2">
-                {comments.map(c => (
+                {comments.map((c) => (
                   <div key={c.id} className="flex items-start gap-2">
                     <div
                       className="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold"
@@ -323,19 +409,28 @@ function PostCard({ post, onReact, onComment }: { post: Post; onReact: (id: numb
                     >
                       {initials(c.userName)}
                     </div>
+
                     <div className="flex-1">
-                      <div className="text-sm"><span className="font-medium">{c.userName}</span> <span className="text-tertiary">· {relTime(c.createdAt)}</span></div>
+                      <div className="text-sm">
+                        <span className="font-medium">{c.userName}</span>{" "}
+                        <span className="text-tertiary">· {relTime(c.createdAt)}</span>
+                      </div>
+
                       <div className="vx-body-sm">{c.content}</div>
                     </div>
                   </div>
                 ))}
               </div>
+
               <div className="flex items-center gap-2">
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") { onComment(post.id, text); setText(""); }
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCommentSubmit();
+                    }
                   }}
                   placeholder="Write a reply…"
                   className={cn(
@@ -344,7 +439,14 @@ function PostCard({ post, onReact, onComment }: { post: Post; onReact: (id: numb
                     "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                   )}
                 />
-                <button onClick={() => { onComment(post.id, text); setText(""); }} className="vx-btn-primary rounded-lg px-4">Reply</button>
+
+                <button
+                  type="button"
+                  onClick={handleCommentSubmit}
+                  className="vx-btn-primary rounded-lg px-4"
+                >
+                  Reply
+                </button>
               </div>
             </div>
           )}
