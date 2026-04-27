@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export type AimSummary = {
 	user: { id: string; email: string; created_at: string };
+	/** Canonical global AIM 0–1 (same as `User.aimScore` / API field, not 0–100). */
 	global_score: number;
 	confidence_score: number;
 	risk_level: "low" | "moderate" | "high" | "critical";

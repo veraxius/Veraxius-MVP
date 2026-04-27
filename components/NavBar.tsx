@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { clearAuth, getAuth } from "@/lib/auth";
+import { formatAimScoreLabel } from "@/lib/aimDisplay";
 
 export function NavBar() {
 	const pathname = usePathname();
@@ -96,7 +97,7 @@ export function NavBar() {
 									<span className="ml-1 inline-flex items-center rounded-full px-2 py-1 border border-[var(--divider)] text-xs text-[var(--text-secondary)]">
 										<span className="vx-mono mr-1 text-amber">AIM</span>
 										<span className="font-semibold text-[var(--text-primary)]">
-											{aim.score.toFixed(2)}%
+											{formatAimScoreLabel(aim.score)}
 										</span>
 									</span>
 								) : (
