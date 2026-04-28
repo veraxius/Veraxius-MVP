@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { getToken } from "@/lib/auth";
-import { aimFractionToPercent } from "@/lib/aimDisplay";
+import { aimFractionToPercent, formatAimScoreLabel } from "@/lib/aimDisplay";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -137,7 +137,6 @@ function DomainRow({
 	isLast: boolean;
 }) {
 	const score = domain.domain_aim_score;           // raw 0–1 value
-	const displayPct = aimFractionToPercent(score);
 
 	// Bar fills from 0% (score = 0.50, neutral start) to 100% (score = 1.00, max trust).
 	// Scores below 0.50 (net negative votes) keep the bar at 0%.
@@ -187,7 +186,7 @@ function DomainRow({
 					className="text-2xl font-bold leading-none tabular-nums w-20 shrink-0"
 					style={{ color: barColor }}
 				>
-					{displayPct.toFixed(1)}%
+					{formatAimScoreLabel(score)}
 				</span>
 				<div className="flex-1 flex flex-col gap-1">
 					<AnimatedBar pct={barPct} color={barColor} />

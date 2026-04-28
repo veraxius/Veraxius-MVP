@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 import ProfileDomains from "@/components/ProfileDomains";
 import { AIMScoreHeroCard } from "@/components/AIMScoreHeroCard";
-import { aimFractionToPercent } from "@/lib/aimDisplay";
+import { formatAimScoreLabel } from "@/lib/aimDisplay";
 
 type AimScoreHistory = {
 	id: string;
@@ -23,18 +23,6 @@ type ActivityItem = {
 	deltaLabel: string;
 	source: "global" | "domain";
 	domain?: string;
-	createdAt: string;
-};
-
-type Challenge = {
-	id: string;
-	targetUserId: string;
-	challengerId: string;
-	reason: string;
-	severity: number;
-	status: string;
-	resolution?: string | null;
-	impact?: number | null;
 	createdAt: string;
 };
 
@@ -62,44 +50,6 @@ export default function ProfilePage() {
 			setError(e instanceof Error ? e.message : "Unknown error");
 		} finally {
 			setLoading(false);
-		}
-	}
-
-	async function loadChallengeStats() {
-		if (!userId) return;
-
-		try {
-			setChallengeLoading(true);
-
-			const res = await fetch(`http://localhost:3001/api/aim/challenges/${userId}`, {
-				cache: "no-store",
-			});
-
-			const data = await res.json();
-			const challenges = getCleanChallenges(data);
-
-			const open = challenges.filter((c) =>
-				["pending", "under_review"].includes((c.status || "").toLowerCase())
-			).length;
-
-			const resolved = challenges.filter((c) =>
-				["resolved", "dismissed", "rejected", "upheld", "malicious", "mixed"].includes(
-					(c.status || "").toLowerCase()
-				)
-			).length;
-
-			setOpenCount(open);
-			setResolvedCount(resolved);
-			setTotalCount(challenges.length);
-			setDisplayStatus(computeStatus(challenges));
-		} catch (e) {
-			console.error("Failed to load challenge stats", e);
-			setOpenCount(0);
-			setResolvedCount(0);
-			setTotalCount(0);
-			setDisplayStatus("Stable");
-		} finally {
-			setChallengeLoading(false);
 		}
 	}
 
@@ -161,7 +111,7 @@ export default function ProfilePage() {
 									</div>
 								</div>
 								<div className="font-semibold tabular-nums text-sm">
-									{aimFractionToPercent(Number(h.score)).toFixed(2)}
+									{formatAimScoreLabel(Number(h.score))}
 								</div>
 							</div>
 						))}

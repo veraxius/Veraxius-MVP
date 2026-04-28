@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { riskBadgeClass, riskGaugeColorClass, riskLevelLabel } from "@/lib/aimDisplay";
+import {
+	formatAimScoreLabel,
+	normalizeAimFraction,
+	riskBadgeClass,
+	riskGaugeColorClass,
+	riskLevelLabel,
+} from "@/lib/aimDisplay";
 import { useAIMScore } from "@/lib/hooks/useAIMScore";
 import { cn } from "@/lib/utils";
 
@@ -44,18 +50,19 @@ function TrendSparkline({
 }
 
 function GaugeRing({
-	percent,
+	aimFraction,
 	colorClass,
 }: {
-	percent: number;
+	/** 0–1 global AIM (matches DB `aimScore`). */
+	aimFraction: number;
 	colorClass: string;
 }) {
-	const pct = Math.max(0, Math.min(100, percent));
+	const f = normalizeAimFraction(aimFraction);
 	const size = 180;
 	const stroke = 12;
 	const radius = (size - stroke) / 2;
 	const circumference = 2 * Math.PI * radius;
-	const dash = (pct / 100) * circumference;
+	const dash = f * circumference;
 
 	return (
 		<div className={cn("relative", colorClass)} style={{ width: size, height: size }}>
@@ -81,7 +88,9 @@ function GaugeRing({
 				/>
 			</svg>
 			<div className="absolute inset-0 flex flex-col items-center justify-center">
-				<div className="text-3xl font-bold tabular-nums">{pct.toFixed(1)}</div>
+				<div className="text-2xl sm:text-3xl font-bold tabular-nums">
+					{formatAimScoreLabel(f)}
+				</div>
 				<div className="text-xs text-[var(--text-secondary)] mt-1">AIM Score</div>
 			</div>
 		</div>
@@ -161,7 +170,7 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 			<div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-8">
 				<div className="flex flex-col items-center shrink-0">
 					<GaugeRing
-						percent={summary.global_score}
+						aimFraction={summary.global_score}
 						colorClass={riskGaugeColorClass(summary.risk_level)}
 					/>
 				</div>

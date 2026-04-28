@@ -1,11 +1,24 @@
 /**
- * AIM scores are stored on the backend as a 0–1 fraction.
- * UI surfaces them as 0–100 for gauges and labels.
+ * AIM scores are stored on the backend as a 0–1 fraction (e.g. 0.5 = neutral baseline).
+ * Product display: show that same scale with two decimals and a % sign → "0.50%" (not "50.00%").
  */
 
+/** Canonical 0–1 value; accepts legacy API values scaled 0–100. */
+export function normalizeAimFraction(raw: number): number {
+	if (!Number.isFinite(raw)) return 0;
+	if (raw > 1) return Math.min(1, Math.max(0, raw / 100));
+	return Math.min(1, Math.max(0, raw));
+}
+
+/** Label shown in navbar and hero, e.g. 0.50% for stored score 0.5. */
+export function formatAimScoreLabel(raw: number): string {
+	return `${normalizeAimFraction(raw).toFixed(2)}%`;
+}
+
+/** 0–100 scale for bar color thresholds and similar (0.5 → 50). */
 export function aimFractionToPercent(fraction: number): number {
 	if (!Number.isFinite(fraction)) return 0;
-	const f = fraction > 1 ? fraction / 100 : fraction;
+	const f = normalizeAimFraction(fraction);
 	return Math.round(Math.min(100, Math.max(0, f * 100)) * 100) / 100;
 }
 

@@ -67,7 +67,8 @@ router.get("/:userId/aim-summary", async (req, res) => {
 		});
 
 		const fraction = Number(user.aimScore);
-		const global_score = Math.round(fraction * 1000) / 10;
+		// Same unit as DB / scoring engine: 0–1 (e.g. 0.5). Clients format as "0.50%".
+		const global_score = Math.round(fraction * 1000) / 1000;
 
 		const confRaw = user.aimConfidence != null ? Number(user.aimConfidence) : null;
 		const confidence_score =
