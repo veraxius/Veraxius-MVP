@@ -24,13 +24,25 @@ export function aimFractionToPercent(fraction: number): number {
 
 export type RiskLevel = "low" | "moderate" | "high" | "critical";
 
-/** Higher global score ⇒ lower risk (green). */
-export function riskLevelFromPercent(percent: number): RiskLevel {
-	const p = Math.min(100, Math.max(0, percent));
-	if (p >= 76) return "low";
-	if (p >= 51) return "moderate";
-	if (p >= 26) return "high";
+/**
+ * Higher global score ⇒ lower risk.
+ * Buckets are anchored to the engine's neutral baseline (0.50):
+ *   ≥ 0.75 → low      (clearly trusted)
+ *   ≥ 0.50 → moderate (baseline / neutral, NOT high risk)
+ *   ≥ 0.25 → high
+ *   < 0.25 → critical
+ */
+export function riskLevelFromFraction(rawFraction: number): RiskLevel {
+	const f = normalizeAimFraction(rawFraction);
+	if (f >= 0.75) return "low";
+	if (f >= 0.5) return "moderate";
+	if (f >= 0.25) return "high";
 	return "critical";
+}
+
+/** @deprecated kept for backwards compat — prefer `riskLevelFromFraction`. */
+export function riskLevelFromPercent(percent: number): RiskLevel {
+	return riskLevelFromFraction(percent / 100);
 }
 
 export function riskLevelLabel(level: RiskLevel): string {
