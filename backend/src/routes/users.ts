@@ -8,11 +8,17 @@ const router = Router();
 
 const aimEngine = new AIMEngine();
 
+/**
+ * Risk buckets anchored to the engine's neutral baseline (0.50 = moderate, not high).
+ * Mirrors `lib/aimDisplay.ts#riskLevelFromFraction` on the frontend.
+ */
 function riskLevelFromFraction(fraction: number): "low" | "moderate" | "high" | "critical" {
-	const pct = fraction > 1 ? fraction : fraction * 100;
-	if (pct >= 76) return "low";
-	if (pct >= 51) return "moderate";
-	if (pct >= 26) return "high";
+	const f = Number.isFinite(fraction)
+		? Math.min(1, Math.max(0, fraction > 1 ? fraction / 100 : fraction))
+		: 0;
+	if (f >= 0.75) return "low";
+	if (f >= 0.5) return "moderate";
+	if (f >= 0.25) return "high";
 	return "critical";
 }
 
