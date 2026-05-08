@@ -209,7 +209,7 @@ export default function HomePage() {
         </section>
 
         <section className="space-y-4">
-          {loading && <div className="text-secondary">Cargando…</div>}
+          {loading && <div className="text-secondary">Loading…</div>}
           {error && <div className="text-red">{error}</div>}
 
           {!loading &&
@@ -230,9 +230,9 @@ export default function HomePage() {
             {!activeConversationId ? (
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b border-[var(--divider)] flex items-center justify-between">
-                  <div className="vx-mono text-sm">Mensajes</div>
+                  <div className="vx-mono text-sm">Messages</div>
                   <button onClick={() => setOpenMessages(false)} className="text-secondary text-sm">
-                    Cerrar
+                    Close
                   </button>
                 </div>
 
@@ -244,7 +244,7 @@ export default function HomePage() {
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b border-[var(--divider)] flex items-center gap-2">
                   <button className="text-sm" onClick={() => setActiveConversationId(null)}>
-                    ← Volver
+                    ← Back
                   </button>
                 </div>
 
@@ -296,7 +296,7 @@ function PostCard({
     const d = new Date(iso).getTime();
     const diff = (Date.now() - d) / 1000;
 
-    if (diff < 60) return "ahora";
+    if (diff < 60) return "now";
     if (diff < 3600) return `${Math.floor(diff / 60)}min`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
 
@@ -352,7 +352,7 @@ function PostCard({
 
             {post.userVerified && (
               <span className="px-1.5 py-0.5 text-amber border border-amber rounded">
-                verificado
+                Verified
               </span>
             )}
 
