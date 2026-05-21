@@ -117,13 +117,13 @@ export default function ProfilePage() {
 						))}
 					</div>
 
-					<h2 className="text-xl font-semibold mt-6 mb-2">Challenge Layer</h2>
+					{/* <h2 className="text-xl font-semibold mt-6 mb-2">Challenge Layer</h2>
 					<div className="border border-vx-divider rounded-xl bg-vx-panel p-4 flex items-center justify-between">
 						<div className="text-sm text-vx-text-secondary">No challenges pending</div>
 						<button type="button" className="vx-btn-primary rounded-lg text-sm font-semibold px-5 py-2.5">
 							Flag an interaction
 						</button>
-					</div>
+					</div> */}
 				</div>
 			</div>
 		</div>
