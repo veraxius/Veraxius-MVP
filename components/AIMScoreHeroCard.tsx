@@ -183,7 +183,7 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 						<p className="font-medium text-[var(--text-primary)] break-all">
 							{summary.user.email}
 						</p>
-						<p className="text-xs text-[var(--text-tertiary)] mt-1">ID: {summary.user.id}</p>
+						{/*<p className="text-xs text-[var(--text-tertiary)] mt-1">ID: {summary.user.id}</p>*/}
 					</div>
 
 					<div className="flex flex-wrap gap-2 items-center">
