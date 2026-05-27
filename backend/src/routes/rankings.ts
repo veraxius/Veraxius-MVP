@@ -1,28 +1,30 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { Prisma } from "@prisma/client";
+import { invalidPayload, internalError } from "../lib/validation";
 
 const router = Router();
 
-// GET /api/rankings
-// Query params:
-// - domain?: string (if provided, rank by domain score; else global aimScore)
-// - limit?: number (default 50)
-// Rules:
-// - Exclude users with confidence < 0.15 from public rankings
-// - Ranking score = score × (0.6 + 0.4 × confidence)
+const RankingsQuerySchema = z.object({
+	domain: z.string().max(80).optional(),
+	limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
 router.get("/", async (req, res) => {
 	try {
-		const domain = typeof req.query.domain === "string" ? req.query.domain : undefined;
-		const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+		const parsed = RankingsQuerySchema.safeParse(req.query);
+		if (!parsed.success) return invalidPayload(res);
+
+		const domain = parsed.data.domain;
+		const limit = parsed.data.limit ?? 50;
 
 		if (!domain) {
-			// Global ranking
 			const users = await prisma.user.findMany({
 				where: { aimConfidence: { gte: new Prisma.Decimal(0.15) } as any },
 				select: { id: true, email: true, name: true, aimScore: true, aimConfidence: true, aimDomainPrimary: true },
 				orderBy: { aimScore: "desc" },
-				take: limit * 3, // overfetch, we'll compute rankingScore then slice
+				take: limit * 3,
 			});
 			const ranked = users
 				.map(u => {
@@ -35,15 +37,13 @@ router.get("/", async (req, res) => {
 			return res.json({ domain: null, items: ranked });
 		}
 
-		// Domain-specific ranking: use AimDomainScore
 		const domainScores = await prisma.aimDomainScore.findMany({
 			where: { domain },
 			orderBy: { score: "desc" },
-			take: limit * 5, // overfetch
+			take: limit * 5,
 			select: { userId: true, domain: true, score: true, confidence: true, interactionCount: true },
 		});
 
-		// Load user confidences and names
 		const userIds = [...new Set(domainScores.map(d => d.userId))];
 		const users = await prisma.user.findMany({
 			where: { id: { in: userIds } },
@@ -51,7 +51,6 @@ router.get("/", async (req, res) => {
 		});
 		const byId = new Map(users.map(u => [u.id, u]));
 
-		// Exclude low confidence globally (<0.15) and low domain confidence/volume per spec
 		const filtered = domainScores.filter(d => {
 			const u = byId.get(d.userId);
 			const globalConf = Number(u?.aimConfidence ?? 0);
@@ -80,12 +79,9 @@ router.get("/", async (req, res) => {
 			.slice(0, limit);
 
 		return res.json({ domain, items: ranked });
-	} catch (err: any) {
-		// eslint-disable-next-line no-console
-		console.error("GET /api/rankings error", err);
-		return res.status(500).json({ error: err?.message || "Internal server error" });
+	} catch (err) {
+		return internalError(res, err, "GET /api/rankings");
 	}
 });
 
 export default router;
-

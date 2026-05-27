@@ -55,6 +55,12 @@ export function calculateEffectiveDelta(input: EffectiveDeltaInput): EffectiveDe
 	const days = daysSince(postCreatedAt);
 	const recencyFactor = Math.exp(-LAMBDA * days);
 
+	// NOTE: This recency factor is intentional for domainAimEvent storage only.
+	// recalculateDomainScore() sums effectiveDelta as-is (no second recency pass).
+	// The corresponding global aimEvent (if created via recordPeerFeedback) stores
+	// delta WITHOUT recency per the aimV2.ts architecture; recomputeAIMScore()
+	// applies recencyFactor dynamically at compute time on aimEvent rows only.
+
 	// contextWeight clamped to [0.75, 1.35]
 	const rawContextWeight = stakeLevel * roleWeight * platformVerification;
 	const contextWeight = clamp(rawContextWeight, 0.75, 1.35);
@@ -397,7 +403,8 @@ export async function onTrustVote(input: TrustVoteInput): Promise<void> {
 		antiAbuseMultiplier,
 	});
 
-	// 8. Persist domain AIM event
+	// 8. Persist domain AIM event (global aimEvent is NOT created here — see posts route
+	//    recordPeerFeedback() + eventProcessor peer_feedback path for the global layer)
 	await prisma.domainAimEvent.create({
 		data: {
 			userId: postUserId,

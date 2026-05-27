@@ -31,7 +31,8 @@ export default function RegisterPage() {
         throw new Error(data?.error || "Registration failed");
       }
       // auto-login
-      saveAuth(data.token, data.user);
+      const token = data.token || data.access_token;
+      saveAuth(token, data.user, data.refresh_token);
       router.push("/home");
     } catch (err: any) {
       setError(err?.message || "Unexpected error");

@@ -16,39 +16,6 @@ type Props = {
 	className?: string;
 };
 
-function TrendSparkline({
-	points,
-}: {
-	points: { score: number; created_at: string }[];
-}) {
-	const width = 320;
-	const height = 72;
-	const scores = points.map((p) =>
-		p.score > 1 ? p.score / 100 : p.score,
-	);
-	const min = Math.min(...scores, 0);
-	const max = Math.max(...scores, 0.01);
-	const range = max - min || 1;
-	const coords = scores.map((v, i) => {
-		const x = scores.length <= 1 ? width / 2 : (i / (scores.length - 1)) * width;
-		const y = height - ((v - min) / range) * height;
-		return `${x},${y}`;
-	});
-	const poly = coords.join(" ");
-
-	return (
-		<svg
-			className="text-vx-amber w-full max-w-md mx-auto"
-			height={height}
-			viewBox={`0 0 ${width} ${height}`}
-			preserveAspectRatio="none"
-			aria-hidden
-		>
-			<polyline fill="none" stroke="currentColor" strokeWidth="2" points={poly} />
-		</svg>
-	);
-}
-
 function GaugeRing({
 	aimFraction,
 	colorClass,
@@ -203,21 +170,7 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 						</span>
 					</div>
 
-					<div className="rounded-xl border border-vx-divider bg-[var(--bg-primary)] p-4">
-						<div className="flex items-center justify-between mb-2">
-							<h3 className="text-sm font-semibold text-[var(--text-primary)]">
-								30-day trend
-							</h3>
-							<span className="text-xs text-[var(--text-secondary)]">{trendLabel}</span>
-						</div>
-						{summary.history_30d.length > 1 ? (
-							<TrendSparkline points={summary.history_30d} />
-						) : (
-							<p className="text-sm text-[var(--text-secondary)]">
-								Not enough history for a 30-day chart yet.
-							</p>
-						)}
-					</div>
+					<p className="text-xs text-[var(--text-secondary)]">{trendLabel}</p>
 				</div>
 			</div>
 

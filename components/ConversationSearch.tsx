@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { API_URL } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 
 type UserLite = { id: string; email: string; name?: string };
 
@@ -15,14 +14,10 @@ export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const search = useCallback(async (query: string) => {
-		const token = getAuth()?.token;
 		const url = new URL(`${API_URL}/api/users/search`);
 		url.searchParams.set("q", query);
-		const res = await fetch(url.toString(), {
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: token ? `Bearer ${token}` : ""
-			}
+		const res = await apiFetch(url.toString(), {
+			headers: { "Content-Type": "application/json" },
 		});
 		if (!res.ok) throw new Error((await res.json()).error || "Search failed");
 		return res.json() as Promise<UserLite[]>;

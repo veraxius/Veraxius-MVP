@@ -23,10 +23,14 @@ export type AimSummary = {
 	history_30d: { score: number; created_at: string }[];
 };
 
-export function useAIMScore(userId: string | undefined) {
+export function useAIMScore(
+	userId: string | undefined,
+	options?: { pollIntervalMs?: number },
+) {
 	const [data, setData] = useState<AimSummary | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const pollIntervalMs = options?.pollIntervalMs;
 
 	const refresh = useCallback(async () => {
 		if (!userId) {
@@ -50,7 +54,10 @@ export function useAIMScore(userId: string | undefined) {
 
 	useEffect(() => {
 		void refresh();
-	}, [refresh]);
+		if (!pollIntervalMs) return;
+		const id = setInterval(() => void refresh(), pollIntervalMs);
+		return () => clearInterval(id);
+	}, [refresh, pollIntervalMs]);
 
 	return { summary: data, loading, error, refresh };
 }

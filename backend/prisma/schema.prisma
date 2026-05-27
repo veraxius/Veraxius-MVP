@@ -11,6 +11,7 @@ model User {
   id           String                    @id @default(uuid())
   email        String                    @unique
   password     String
+  googleId     String?                   @unique
   name         String?
   created_at   DateTime                  @default(now())
   lastActiveAt DateTime?
@@ -84,11 +85,12 @@ model AimEvent {
 }
 
 model AimScoreHistory {
-  id        String   @id @default(uuid())
-  userId    String
-  score     Float
-  context   String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  userId       String
+  score        Float
+  context      String?
+  explanations Json?
+  createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

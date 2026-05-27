@@ -30,6 +30,14 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AIMCFG = require("../../aim.config.js");
 
+/**
+ * Rolling window for recomputeAIMScore() event queries.
+ * Events older than this contribute ~0 to the score (exp(-λ×365) ≈ 0.000002 at λ=0.05),
+ * so excluding them is a safe performance optimization, not a scoring approximation.
+ */
+const SCORE_WINDOW_DAYS = 365;
+const MS_PER_DAY = 86_400_000;
+
 // ─── Shared Types ──────────────────────────────────────────────────────────────
 
 export type StakeLevel          = "high" | "standard" | "low";
@@ -216,9 +224,25 @@ export async function runConsistencyCheck(userId: string) {
 	const sevenDaysAgo  = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000);
 	const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-	const recentPosts   = await prisma.post.count({ where: { userId, createdAt: { gte: sevenDaysAgo } } });
-	const baselinePosts = await prisma.post.count({ where: { userId, createdAt: { gte: thirtyDaysAgo, lt: sevenDaysAgo } } });
+	const recentEvents = await prisma.post.findMany({
+		where:  { userId, createdAt: { gte: sevenDaysAgo } },
+		select: { id: true },
+	});
+	const baselineEvents = await prisma.post.findMany({
+		where:  { userId, createdAt: { gte: thirtyDaysAgo, lt: sevenDaysAgo } },
+		select: { id: true },
+	});
+	const recentPosts   = recentEvents.length;
+	const baselinePosts = baselineEvents.length;
 	const postFreqDev   = baselinePosts > 0 ? (baselinePosts - recentPosts) / baselinePosts : 0;
+
+	const recentLatency   = recentEvents.length;
+	const baselineLatency = baselineEvents.length;
+	// Activity frequency deviation between the last 7 days vs the 7-30 day baseline window.
+	// A deviation > 0.5 means the user's activity dropped or spiked by more than 50%.
+	const latencyDev = baselineLatency > 0
+		? Math.abs(recentLatency - baselineLatency) / baselineLatency
+		: (recentLatency === 0 ? 0 : 1.0);
 
 	const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 	const recentReactions  = await prisma.postReaction.count({ where: { userId, post: { createdAt: { gte: fourteenDaysAgo } } } });
@@ -233,6 +257,7 @@ export async function runConsistencyCheck(userId: string) {
 
 	let breaks  = 0;
 	let matches = 0;
+	if (latencyDev > 0.5)       breaks  += 1;
 	if (postFreqDev > 0.7)      breaks  += 1;
 	if (votePatternDev > 0.4)   breaks  += 1;
 	if (primary && !hasPrimaryActivity) breaks  += 1;
@@ -240,14 +265,15 @@ export async function runConsistencyCheck(userId: string) {
 
 	await prisma.aimConsistency.upsert({
 		where:  { userId },
-		update: { breakCount: breaks, matchCount: matches, lastSnapshot: { postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
-		create: { userId, breakCount: breaks, matchCount: matches, lastSnapshot: { postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
+		update: { breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, recentLatency, baselineLatency, postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
+		create: { userId, breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, recentLatency, baselineLatency, postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
 	});
 
 	type EventData = Parameters<typeof prisma.aimEvent.create>[0]["data"];
 	const events: EventData[] = [];
 	const cfg = AIMCFG.consistency;
 
+	if (latencyDev > 0.5)    events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyA, weight: 1, contextWeight: 1, metadata: { kind: "latency_deviation",     value: latencyDev } });
 	if (postFreqDev > 0.7)   events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyB, weight: 1, contextWeight: 1, metadata: { kind: "post_frequency_drop",   value: postFreqDev } });
 	if (votePatternDev > 0.4) events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyC, weight: 1, contextWeight: 1, metadata: { kind: "vote_pattern_change",   value: votePatternDev } });
 	if (primary && !hasPrimaryActivity) events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyD, weight: 1, contextWeight: 1, metadata: { kind: "claim_action_alignment", primary } });
@@ -255,6 +281,7 @@ export async function runConsistencyCheck(userId: string) {
 
 	if (events.length) {
 		await prisma.$transaction(events.map(data => prisma.aimEvent.create({ data })));
+		await recomputeAIMScore(userId, undefined, { historyContext: "consistency_check" });
 	}
 }
 
@@ -417,6 +444,8 @@ export interface ProcessSignalInput {
 	domain?:         string;
 	/** Override anti-abuse multiplier (e.g., from external abuse detection). */
 	antiAbuseMultiplier?: number;
+	/** When true, caller must invoke recomputeAIMScore() after this returns. */
+	deferRecompute?: boolean;
 }
 
 export interface ProcessSignalResult {
@@ -436,7 +465,7 @@ export interface ProcessSignalResult {
  *                              × confidenceMultiplier × antiAbuseMultiplier
  *                              × sourceCredibilityFactor
  * 4. Persists an AimEvent
- * 5. Returns result (caller is responsible for triggering recomputeAIMScore)
+ * 5. Returns result; triggers recomputeAIMScore unless deferRecompute is true
  */
 export async function processAimSignal(input: ProcessSignalInput): Promise<ProcessSignalResult> {
 	const {
@@ -501,6 +530,10 @@ export async function processAimSignal(input: ProcessSignalInput): Promise<Proce
 			},
 		},
 	});
+
+	if (!input.deferRecompute) {
+		await recomputeAIMScore(userId, domain, { historyContext: kind });
+	}
 
 	return { ok: true, effectiveDelta, eventId: event.id };
 }
@@ -629,7 +662,14 @@ export async function resolveChallenge(
 		);
 	}
 
-	if (txOps.length) await prisma.$transaction(txOps);
+	if (txOps.length) {
+		await prisma.$transaction(txOps);
+		const historyContext = `challenge_resolved_${resolution}`;
+		await recomputeAIMScore(targetId, undefined, { historyContext });
+		if (challengerDelta !== 0 && ch.challengerId) {
+			await recomputeAIMScore(ch.challengerId, undefined, { historyContext });
+		}
+	}
 
 	return { ch, targetDelta, challengerDelta };
 }
@@ -638,25 +678,46 @@ export async function resolveChallenge(
 
 /**
  * Daily cron job: apply inactivity decay to all users.
- * Decay ONLY kicks in after AIMCFG.decay.inactivityThresholdDays (30) days of inactivity.
+ * Decay ONLY kicks in after AIMCFG.decay.inactivityThresholdDays (7) days of inactivity.
  * qualityShield reduces the rate for users with a strong historical track record.
+ *
+ * MVP4 spec sequence (per Alignment Document):
+ *   1. Persist a `decay_applied` row in the events table (audit / orchestration log)
+ *   2. Emit the decay signal as an AimEvent
+ *   3. Recompute the user's AIM score from all events (no direct score mutation here)
  */
-export async function applyDecayToAllUsers() {
+export type ApplyDecaySummary = {
+	totalUsers: number;
+	processed: number;
+	skipped: number;
+};
+
+export async function applyDecayToAllUsers(): Promise<ApplyDecaySummary> {
 	const now   = new Date();
 	const users = await prisma.user.findMany({
 		select: { id: true, aimScore: true, created_at: true, lastActiveAt: true },
 	});
 
+	let processed = 0;
+
 	for (const u of users) {
 		const lastActive = u.lastActiveAt ?? u.created_at;
 		const days       = daysBetween(lastActive, now);
 
-		// Grace period — no decay before threshold
-		if (days < AIMCFG.decay.inactivityThresholdDays) continue;
+		// Grace period — no decay before threshold (≤7 days per MVP4)
+		if (days <= AIMCFG.decay.inactivityThresholdDays) continue;
 
 		// Time multiplier from the table (first match wins)
-		const tm = AIMCFG.decay.timeMultipliers.find((t: { maxDays: number; multiplier: number }) => days <= t.maxDays)?.multiplier ?? 2.0;
-		if (tm === 0) continue; // still in grace window per table
+		let tm = AIMCFG.decay.timeMultipliers.find(
+			(t: { maxDays: number; multiplier: number }) => days <= t.maxDays,
+		)?.multiplier ?? 5.0;
+
+		// 90+ days: document uses penalty 10.0 (score ≥80 on 0–100) vs 14.0 — mapped to 5.0 / 7.0
+		if (days > 90) {
+			tm = u.aimScore >= 0.80 ? 5.0 : 7.0;
+		}
+
+		if (tm === 0) continue;
 
 		// qualityShield: proportional to historical outcome quality
 		const outcomes = await prisma.aimOutcome.findMany({
@@ -677,26 +738,58 @@ export async function applyDecayToAllUsers() {
 		const newDelta       = -dailyDecayRate;
 		const newScore       = clamp(u.aimScore + newDelta, floor, 1);
 
-		if (newScore !== u.aimScore) {
-			await prisma.$transaction([
-				prisma.user.update({
-					where: { id: u.id },
-					data:  { aimScore: newScore },
-				}),
-				prisma.aimEvent.create({
-					data: {
-						userId:       u.id,
-						eventType:    "decay",
-						signal:       "inactivity_decay",
-						delta:        newDelta,
-						weight:       1,
-						contextWeight: 1,
-						metadata: { daysInactive: days, qualityShield, dailyDecayRate, tm },
-					},
-				}),
-			]);
-		}
+		if (newScore === u.aimScore) continue;
+
+		// Step 1 — decay_applied event (events table) before signal + recompute
+		const decayApplied = await prisma.event.create({
+			data: {
+				type:   "decay_applied",
+				userId: u.id,
+				status: "pending",
+				payload: {
+					daysInactive: days,
+					timeMultiplier: tm,
+					qualityShield,
+					dailyDecayRate,
+					delta: newDelta,
+					scoreBefore: u.aimScore,
+					scoreAfter: newScore,
+				},
+			},
+		});
+
+		// Step 2 — decay signal (AimEvent)
+		await prisma.aimEvent.create({
+			data: {
+				userId:        u.id,
+				eventType:     "decay",
+				signal:        "inactivity_decay",
+				delta:         newDelta,
+				weight:        1,
+				contextWeight: 1,
+				metadata: { daysInactive: days, qualityShield, dailyDecayRate, tm },
+			},
+		});
+
+		// Step 3 — recompute global score from stored events (do not reset lastActiveAt)
+		await recomputeAIMScore(u.id, undefined, {
+			touchLastActive: false,
+			historyContext:  "inactivity_decay",
+		});
+
+		await prisma.event.update({
+			where: { id: decayApplied.id },
+			data:  { status: "completed" },
+		});
+
+		processed += 1;
 	}
+
+	return {
+		totalUsers: users.length,
+		processed,
+		skipped: users.length - processed,
+	};
 }
 
 // ─── VARIABLE 6 — CONFIDENCE ─────────────────────────────────────────────────
@@ -784,6 +877,82 @@ export async function calculateConfidence(userId: string, verificationFallback: 
 	return clamp(rawConfidence, 0, stabilityGate);
 }
 
+// ─── SCORE EXPLANATIONS (MVP4) ────────────────────────────────────────────────
+
+export type AimScoreParts = {
+	base: number;
+	reliability: number;
+	consistency: number;
+	peerValidation: number;
+	contradiction: number;
+	decay: number;
+};
+
+export type ScoreExplanation = {
+	signal: string;
+	impact: number;
+	text: string;
+};
+
+function explanationText(eventType: string, signal: string | null): string {
+	if (eventType === "reliability") {
+		if (signal === "outcome_success") return "Verified successful outcome";
+		if (signal === "outcome_failure") return "Failed outcome recorded";
+	}
+	if (eventType === "peer_validation") {
+		if (signal === "peer_endorsement") return "Peer endorsement received";
+		if (signal === "peer_dispute") return "Peer dispute received";
+	}
+	if (eventType === "contradiction" && (signal ?? "").startsWith("challenge_opened")) {
+		return "Challenge opened against you";
+	}
+	if (eventType === "decay" && signal === "inactivity_decay") {
+		return "Score reduced due to inactivity";
+	}
+	return `${eventType.replace(/_/g, " ")}${signal ? `: ${signal}` : ""}`;
+}
+
+/**
+ * Build human-readable explanations from recent signals and attach them to the
+ * latest aimScoreHistory snapshot for this user/context.
+ */
+export async function generateExplanations(
+	userId: string,
+	_parts: AimScoreParts,
+	context: string,
+): Promise<ScoreExplanation[]> {
+	const recentEvents = await prisma.aimEvent.findMany({
+		where:   { userId },
+		orderBy: { createdAt: "desc" },
+		take:    5,
+		select:  { eventType: true, signal: true, delta: true },
+	});
+
+	let explanations: ScoreExplanation[] = recentEvents.map((ev) => ({
+		signal: ev.signal ?? ev.eventType,
+		impact: ev.delta,
+		text:   explanationText(ev.eventType, ev.signal),
+	}));
+
+	if (explanations.length === 0) {
+		explanations = [{ signal: "baseline", impact: 0, text: "Score snapshot recorded" }];
+	}
+
+	const history = await prisma.aimScoreHistory.findFirst({
+		where:   { userId, context },
+		orderBy: { createdAt: "desc" },
+	});
+
+	if (history) {
+		await prisma.aimScoreHistory.update({
+			where: { id: history.id },
+			data:  { explanations },
+		});
+	}
+
+	return explanations;
+}
+
 // ─── CENTRAL RECOMPUTE ───────────────────────────────────────────────────────
 
 /**
@@ -799,10 +968,31 @@ export async function calculateConfidence(userId: string, verificationFallback: 
  * Global blend:
  *   if eligible domains exist:
  *     aimGlobal = 0.75 × generalScore + 0.25 × weightedDomainComposite
+ *
+ * Performance: only aimEvents from the last SCORE_WINDOW_DAYS (365) are loaded.
+ * Older events are omitted because exponential recency decay makes their contribution
+ * negligible (Math.exp(-0.05 × 365) ≈ 0.000002); this does not materially change the score.
  */
-export async function recomputeAIMScore(userId: string, domain?: string) {
-	const now    = new Date();
-	const events = await prisma.aimEvent.findMany({ where: { userId } });
+export type RecomputeAIMScoreOptions = {
+	touchLastActive?: boolean;
+	/** Stored on aimScoreHistory.context — identifies what triggered this snapshot. */
+	historyContext?: string;
+};
+
+export async function recomputeAIMScore(
+	userId: string,
+	domain?: string,
+	options?: RecomputeAIMScoreOptions,
+) {
+	const historyContext = options?.historyContext ?? "recomputed";
+	const now          = new Date();
+	const windowStart  = new Date(now.getTime() - SCORE_WINDOW_DAYS * MS_PER_DAY);
+	const events = await prisma.aimEvent.findMany({
+		where: {
+			userId,
+			createdAt: { gte: windowStart },
+		},
+	});
 
 	// ── Sum all event deltas with recency weighting ───────────────────────────
 	// Positive buckets: reliability, consistency, peer_validation
@@ -888,22 +1078,34 @@ export async function recomputeAIMScore(userId: string, domain?: string) {
 	await prisma.user.update({
 		where: { id: userId },
 		data: {
-			aimScore:     aimGlobal,
+			aimScore:      aimGlobal,
 			aimStatus,
 			aimConfidence: new Prisma.Decimal(confidenceScore.toFixed(2)),
-			lastActiveAt:  now,
+			...(options?.touchLastActive !== false ? { lastActiveAt: now } : {}),
 		},
 	});
 
 	// ── Score history snapshot ────────────────────────────────────────────────
+	const parts: AimScoreParts = {
+		base,
+		reliability,
+		consistency,
+		peerValidation,
+		contradiction,
+		decay,
+	};
+
 	await prisma.aimScoreHistory.create({
-		data: { userId, score: aimGlobal, context: "recomputed" },
+		data: { userId, score: aimGlobal, context: historyContext },
 	});
+
+	const explanations = await generateExplanations(userId, parts, historyContext);
 
 	return {
 		aim:        aimGlobal,
 		confidence: confidenceScore,
 		rankingScore,
-		parts: { base, reliability, consistency, peerValidation, contradiction, decay },
+		parts,
+		explanations,
 	};
 }

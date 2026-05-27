@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
-import { API_URL } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import { getAuth } from "@/lib/auth";
 import { ConversationList } from "@/components/ConversationList";
 import { ChatWindow } from "@/components/ChatWindow";
@@ -84,12 +84,9 @@ export default function HomePage() {
     try {
       setError(null);
 
-      const resp = await fetch(`${API_URL}/api/posts`, {
+      const resp = await apiFetch(`${API_URL}/api/posts`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${auth.token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text }),
       });
 
@@ -114,12 +111,9 @@ export default function HomePage() {
     try {
       setError(null);
 
-      const resp = await fetch(`${API_URL}/api/posts/${postId}/react`, {
+      const resp = await apiFetch(`${API_URL}/api/posts/${postId}/react`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${auth.token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type }),
       });
 
@@ -146,12 +140,9 @@ export default function HomePage() {
     try {
       setError(null);
 
-      const resp = await fetch(`${API_URL}/api/posts/${postId}/comments`, {
+      const resp = await apiFetch(`${API_URL}/api/posts/${postId}/comments`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${auth.token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: cleanText }),
       });
 

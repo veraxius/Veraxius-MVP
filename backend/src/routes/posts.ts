@@ -1,11 +1,29 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
 import { recordPeerFeedback } from "../lib/aimV2";
 import { onPostCreated, onPostDeleted } from "../lib/domainScoreService";
 import { processPendingEvents } from "../lib/eventProcessor";
+import { zContent, invalidPayload, internalError } from "../lib/validation";
 
 const router = Router();
+
+const CreatePostSchema = z.object({
+  content: zContent,
+});
+
+const ReactSchema = z.object({
+  type: z.enum(["util", "confiable", "not_reliable"]),
+});
+
+const CommentSchema = z.object({
+  content: zContent,
+});
+
+const PostIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
 
 router.get("/", async (_req, res) => {
   try {
@@ -19,20 +37,18 @@ router.get("/", async (_req, res) => {
     });
 
     return res.json(posts);
-  } catch (err: any) {
-    console.error("GET /api/posts error", err);
-    return res.status(500).json({ error: err?.message || "Internal server error" });
+  } catch (err) {
+    return internalError(res, err, "GET /api/posts");
   }
 });
 
 router.post("/", requireAuth, async (req, res) => {
   try {
-    const userId = req.userId as string;
-    const { content } = req.body as { content?: string };
+    const parsed = CreatePostSchema.safeParse(req.body);
+    if (!parsed.success) return invalidPayload(res);
 
-    if (!content || !content.trim()) {
-      return res.status(400).json({ error: "Content required" });
-    }
+    const userId = req.userId as string;
+    const content = parsed.data.content.trim();
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name ?? user?.email?.split("@")[0] ?? "user";
@@ -42,7 +58,7 @@ router.post("/", requireAuth, async (req, res) => {
         userId,
         userName,
         userVerified: false,
-        content: content.trim(),
+        content,
       },
     });
 
@@ -51,21 +67,20 @@ router.post("/", requireAuth, async (req, res) => {
     });
 
     return res.json(post);
-  } catch (err: any) {
-    console.error("POST /api/posts error", err);
-    return res.status(500).json({ error: err?.message || "Internal server error" });
+  } catch (err) {
+    return internalError(res, err, "POST /api/posts");
   }
 });
 
 router.post("/:id/react", requireAuth, async (req, res) => {
   try {
-    const userId = req.userId as string;
-    const postId = Number(req.params.id);
-    const { type } = req.body as { type?: string };
+    const params = PostIdParamsSchema.safeParse(req.params);
+    const body = ReactSchema.safeParse(req.body);
+    if (!params.success || !body.success) return invalidPayload(res);
 
-    if (!postId || (type !== "util" && type !== "confiable" && type !== "not_reliable")) {
-      return res.status(400).json({ error: "Invalid payload" });
-    }
+    const userId = req.userId as string;
+    const postId = params.data.id;
+    const { type } = body.data;
 
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ error: "Post not found" });
@@ -84,7 +99,6 @@ router.post("/:id/react", requireAuth, async (req, res) => {
       select: { id: true },
     });
 
-    // UNDO reaction
     if (existing) {
       await prisma.postReaction.delete({
         where: { id: existing.id },
@@ -104,7 +118,6 @@ router.post("/:id/react", requireAuth, async (req, res) => {
       return res.json({ toggled: "off" });
     }
 
-    // ADD reaction
     await prisma.postReaction.create({
       data: {
         postId,
@@ -177,18 +190,18 @@ router.post("/:id/react", requireAuth, async (req, res) => {
     }
 
     return res.json({ toggled: "on" });
-  } catch (err: any) {
-    console.error("POST /api/posts/:id/react error", err);
-    return res.status(500).json({ error: err?.message || "Internal server error" });
+  } catch (err) {
+    return internalError(res, err, "POST /api/posts/:id/react");
   }
 });
 
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
-    const userId = req.userId as string;
-    const postId = Number(req.params.id);
+    const params = PostIdParamsSchema.safeParse(req.params);
+    if (!params.success) return invalidPayload(res);
 
-    if (!postId) return res.status(400).json({ error: "Invalid post id" });
+    const userId = req.userId as string;
+    const postId = params.data.id;
 
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ error: "Post not found" });
@@ -201,21 +214,20 @@ router.delete("/:id", requireAuth, async (req, res) => {
     await prisma.post.delete({ where: { id: postId } });
 
     return res.json({ ok: true });
-  } catch (err: any) {
-    console.error("DELETE /api/posts/:id error", err);
-    return res.status(500).json({ error: err?.message || "Internal server error" });
+  } catch (err) {
+    return internalError(res, err, "DELETE /api/posts/:id");
   }
 });
 
 router.post("/:id/comments", requireAuth, async (req, res) => {
   try {
-    const userId = req.userId as string;
-    const postId = Number(req.params.id);
-    const { content } = req.body as { content?: string };
+    const params = PostIdParamsSchema.safeParse(req.params);
+    const body = CommentSchema.safeParse(req.body);
+    if (!params.success || !body.success) return invalidPayload(res);
 
-    if (!postId || !content || !content.trim()) {
-      return res.status(400).json({ error: "Invalid payload" });
-    }
+    const userId = req.userId as string;
+    const postId = params.data.id;
+    const content = body.data.content.trim();
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name ?? user?.email?.split("@")[0] ?? "user";
@@ -225,14 +237,13 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
         postId,
         userId,
         userName,
-        content: content.trim(),
+        content,
       },
     });
 
     return res.json(comment);
-  } catch (err: any) {
-    console.error("POST /api/posts/:id/comments error", err);
-    return res.status(500).json({ error: err?.message || "Internal server error" });
+  } catch (err) {
+    return internalError(res, err, "POST /api/posts/:id/comments");
   }
 });
 

@@ -156,19 +156,19 @@ module.exports = {
   },
 
   // ─── Variable 5: Decay ───────────────────────────────────────────────────
+  // MVP4 Alignment Document: grace ≤7d, then escalating penalties by inactivity band.
   decay: {
-    // Decay only starts after this many days of inactivity (spec: 30 days)
-    inactivityThresholdDays: 30,
+    inactivityThresholdDays: 7,
 
     baseDailyRate: 0.002,    // 0.2% per day after threshold
 
-    // Additional rate multipliers based on how long the user has been inactive
+    // First matching band wins (days inactive). 90+ uses 5.0 or 7.0 in applyDecayToAllUsers().
     timeMultipliers: [
-      { maxDays:  30, multiplier: 0.0  },  // ≤30 days — NO decay (grace period)
-      { maxDays:  60, multiplier: 0.5  },  // 31–60 days — half rate
-      { maxDays:  90, multiplier: 1.0  },  // 61–90 days — full rate
-      { maxDays: 180, multiplier: 1.5  },  // 91–180 days — accelerated
-      { maxDays: Infinity, multiplier: 2.0 }, // 180+ days — maximum erosion
+      { maxDays: 7,        multiplier: 0.0  },  // ≤7 days — no decay
+      { maxDays: 30,       multiplier: 0.75 }, // 8–30 days — light
+      { maxDays: 60,       multiplier: 2.0  }, // 31–60 days — moderate
+      { maxDays: 90,       multiplier: 3.75 }, // 61–90 days — heavy
+      { maxDays: Infinity, multiplier: 5.0  }, // 90+ days — maximum (high-score users)
     ],
 
     // qualityShield reduces decay for users with strong historical quality

@@ -1,3 +1,5 @@
+-- DEPRECATED for fresh installs: applied automatically by 20260408011606 on empty tables.
+-- Run manually ONLY when upgrading a legacy database that still has AimEvent.type/value/context.
 BEGIN;
 DO $$ BEGIN ALTER TABLE "AimEvent" ADD COLUMN IF NOT EXISTS "delta" DOUBLE PRECISION; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE "AimEvent" ADD COLUMN IF NOT EXISTS "eventType" TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;

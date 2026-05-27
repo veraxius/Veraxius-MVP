@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { API_URL } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import { getAuth } from "@/lib/auth";
 
 /** Posts feed used as the MVP4 “interactions” surface (create post → domain signals → AIM). */
@@ -49,12 +49,9 @@ export function useInteractionsFeed() {
 
 	async function createPost(content: string) {
 		const auth = getAuth();
-		const resp = await fetch(`${API_URL}/api/posts`, {
+		const resp = await apiFetch(`${API_URL}/api/posts`, {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: auth?.token ? `Bearer ${auth.token}` : "",
-			},
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ content }),
 		});
 		const data = await resp.json();

@@ -1,3 +1,5 @@
+-- DEPRECATED for fresh installs: schema-only deploy does not need this script.
+-- DATA migration only — run manually when upgrading a legacy DB with fake 0.5 domain scores.
 -- ============================================================
 -- Migration: Remove the artificial 0.5 baseline from domain scores
 -- Domain AIM Score now starts at 0 and is driven only by real votes.

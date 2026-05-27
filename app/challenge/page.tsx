@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getAuth } from "@/lib/auth";
+import { API_URL, apiFetch } from "@/lib/api";
 
 type Challenge = {
   id: string;
@@ -76,7 +77,7 @@ export default function ChallengePage() {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:3001/api/aim/challenge", {
+      const res = await apiFetch(`${API_URL}/api/aim/challenge`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -176,8 +177,8 @@ export default function ChallengePage() {
       setResolveLoading(true);
       setResolveMsg(null);
 
-      const res = await fetch(
-        `http://localhost:3001/api/aim/challenge/${selected.id}/resolve`,
+      const res = await apiFetch(
+        `${API_URL}/api/aim/challenge/${selected.id}/resolve`,
         {
           method: "POST",
           headers: {

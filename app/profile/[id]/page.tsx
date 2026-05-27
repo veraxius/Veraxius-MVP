@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 import ProfileDomains from "@/components/ProfileDomains";
 import { AIMScoreHeroCard } from "@/components/AIMScoreHeroCard";
+import { AIMScoreHistoryChart } from "@/components/AIMScoreHistoryChart";
 import { formatAimScoreLabel } from "@/lib/aimDisplay";
 
 type AimScoreHistory = {
@@ -64,6 +65,8 @@ export default function ProfilePage() {
 			<h1 className="text-2xl font-semibold">Adaptive Integrity System</h1>
 
 			<AIMScoreHeroCard userId={userId} />
+
+			<AIMScoreHistoryChart userId={userId} pollIntervalMs={10_000} />
 
 			{userId && (
 				<div className="w-full">

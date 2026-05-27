@@ -1,17 +1,28 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
 import { extractUserIdFromBearer } from "../lib/domainScoreService";
 import { AIMEngine } from "../lib/aimEngine";
+import { zUuid, invalidPayload, internalError } from "../lib/validation";
 
 const router = Router();
 
 const aimEngine = new AIMEngine();
 
-/**
- * Risk buckets anchored to the engine's neutral baseline (0.50 = moderate, not high).
- * Mirrors `lib/aimDisplay.ts#riskLevelFromFraction` on the frontend.
- */
+const SearchQuerySchema = z.object({
+	q: z.string().max(100).optional(),
+});
+
+const UserIdParamsSchema = z.object({
+	userId: zUuid,
+});
+
+const DomainParamsSchema = z.object({
+	userId: zUuid,
+	domainName: z.string().min(1).max(80),
+});
+
 function riskLevelFromFraction(fraction: number): "low" | "moderate" | "high" | "critical" {
 	const f = Number.isFinite(fraction)
 		? Math.min(1, Math.max(0, fraction > 1 ? fraction / 100 : fraction))
@@ -22,12 +33,15 @@ function riskLevelFromFraction(fraction: number): "low" | "moderate" | "high" | 
 	return "critical";
 }
 
-// GET /api/users/search?q=  — protected
 router.get("/search", requireAuth, async (req, res) => {
 	try {
-		const q = String(req.query.q || "").trim();
+		const query = SearchQuerySchema.safeParse(req.query);
+		if (!query.success) return invalidPayload(res);
+
+		const q = (query.data.q || "").trim();
 		const userId = req.userId as string;
 		if (!q) return res.json([]);
+
 		const users = await prisma.user.findMany({
 			where: {
 				email: { contains: q, mode: "insensitive" },
@@ -37,20 +51,17 @@ router.get("/search", requireAuth, async (req, res) => {
 			take: 10
 		});
 		return res.json(users);
-	} catch (err: any) {
-		// eslint-disable-next-line no-console
-		console.error("User search error:", err);
-		return res.status(500).json({ error: err?.message || "Internal server error" });
+	} catch (err) {
+		return internalError(res, err, "User search error:");
 	}
 });
 
-/**
- * GET /api/users/:userId/aim-summary
- * MVP4-shaped summary for dashboard / hero card (frontend maps from FastAPI-style naming).
- */
 router.get("/:userId/aim-summary", async (req, res) => {
 	try {
-		const { userId } = req.params as { userId: string };
+		const params = UserIdParamsSchema.safeParse(req.params);
+		if (!params.success) return invalidPayload(res);
+
+		const { userId } = params.data;
 
 		const user = await prisma.user.findUnique({
 			where: { id: userId },
@@ -73,7 +84,6 @@ router.get("/:userId/aim-summary", async (req, res) => {
 		});
 
 		const fraction = Number(user.aimScore);
-		// Same unit as DB / scoring engine: 0–1 (e.g. 0.5). Clients format as "0.50%".
 		const global_score = Math.round(fraction * 1000) / 1000;
 
 		const confRaw = user.aimConfidence != null ? Number(user.aimConfidence) : null;
@@ -123,29 +133,20 @@ router.get("/:userId/aim-summary", async (req, res) => {
 				created_at: h.createdAt.toISOString(),
 			})),
 		});
-	} catch (err: any) {
-		// eslint-disable-next-line no-console
-		console.error("GET /api/users/:userId/aim-summary error", err);
-		return res.status(500).json({ error: err?.message || "Internal server error" });
+	} catch (err) {
+		return internalError(res, err, "GET /api/users/:userId/aim-summary");
 	}
 });
 
-// ─── Domain endpoints (public, with optional auth for owner-only data) ────────
-
-/**
- * GET /api/users/:userId/domains
- * Returns all public domain scores for a user.
- * If the requester is the same user, also includes domains_in_progress.
- */
 router.get("/:userId/domains", async (req, res) => {
 	try {
-		const { userId } = req.params as { userId: string };
+		const params = UserIdParamsSchema.safeParse(req.params);
+		if (!params.success) return invalidPayload(res);
 
-		// Optional auth — detect if requester is the profile owner
+		const { userId } = params.data;
 		const requesterId = extractUserIdFromBearer(req.headers.authorization);
 		const isOwner = requesterId === userId;
 
-		// Fetch all public domain scores, ordered by domain_aim_score DESC
 		const publicScores = await prisma.userDomainScore.findMany({
 			where: { userId, isPublic: true },
 			orderBy: { domainAimScore: "desc" },
@@ -170,7 +171,6 @@ router.get("/:userId/domains", async (req, res) => {
 
 		const response: Record<string, unknown> = { domains };
 
-		// Show in-progress domains only to the owner
 		if (isOwner) {
 			const allScores = await prisma.userDomainScore.findMany({
 				where: { userId, isPublic: false, interactionCount: { gte: 1, lt: 5 } },
@@ -184,20 +184,17 @@ router.get("/:userId/domains", async (req, res) => {
 		}
 
 		return res.json(response);
-	} catch (err: any) {
-		// eslint-disable-next-line no-console
-		console.error("GET /api/users/:userId/domains error:", err);
-		return res.status(500).json({ error: err?.message || "Internal server error" });
+	} catch (err) {
+		return internalError(res, err, "GET /api/users/:userId/domains");
 	}
 });
 
-/**
- * GET /api/users/:userId/domains/:domainName
- * Returns detailed domain info including recent events and score history.
- */
 router.get("/:userId/domains/:domainName", async (req, res) => {
 	try {
-		const { userId, domainName } = req.params as { userId: string; domainName: string };
+		const params = DomainParamsSchema.safeParse(req.params);
+		if (!params.success) return invalidPayload(res);
+
+		const { userId, domainName } = params.data;
 
 		const score = await prisma.userDomainScore.findUnique({
 			where: { userId_domainName: { userId, domainName } },
@@ -206,7 +203,6 @@ router.get("/:userId/domains/:domainName", async (req, res) => {
 			return res.status(404).json({ error: "Domain not found or not public" });
 		}
 
-		// Recent events (last 10, non-reversed)
 		const recentEvents = await prisma.domainAimEvent.findMany({
 			where: { userId, domainName, isReversed: false },
 			orderBy: { createdAt: "desc" },
@@ -220,7 +216,6 @@ router.get("/:userId/domains/:domainName", async (req, res) => {
 			},
 		});
 
-		// Score history: last 30 days of decay + vote events
 		const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 		const historyEvents = await prisma.domainAimEvent.findMany({
 			where: { userId, domainName, isReversed: false, createdAt: { gte: thirtyDaysAgo } },
@@ -228,7 +223,6 @@ router.get("/:userId/domains/:domainName", async (req, res) => {
 			select: { createdAt: true, effectiveDelta: true },
 		});
 
-		// Build running score history
 		let runningScore = 0.5;
 		const scoreHistory = historyEvents.map((e) => {
 			runningScore = Math.max(0, Math.min(1, runningScore + e.effectiveDelta));
@@ -250,10 +244,8 @@ router.get("/:userId/domains/:domainName", async (req, res) => {
 			score_history: scoreHistory,
 			recent_events: recentEvents,
 		});
-	} catch (err: any) {
-		// eslint-disable-next-line no-console
-		console.error("GET /api/users/:userId/domains/:domainName error:", err);
-		return res.status(500).json({ error: err?.message || "Internal server error" });
+	} catch (err) {
+		return internalError(res, err, "GET /api/users/:userId/domains/:domainName");
 	}
 });
 

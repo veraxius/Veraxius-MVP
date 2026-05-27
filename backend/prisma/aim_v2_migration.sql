@@ -1,3 +1,7 @@
+-- DEPRECATED: Use Prisma migrations instead of running this file directly.
+-- Schema is applied by: prisma/migrations/20260408011606_add_domain_models/migration.sql
+-- Remaining gaps (Event table, aimScore default): 20260527140000_incorporate_aim_v2_schema
+--
 -- AlterTable
 ALTER TABLE "AimChallenge" ADD COLUMN     "reason" TEXT NOT NULL,
 ADD COLUMN     "resolution" TEXT,

@@ -1,6 +1,6 @@
 import { prisma } from "../config/prisma";
-import { calculateAimScore, createAimEvent } from "./aim";
-import { microRecalcQueue } from "./aimQueue";
+import { processAimSignal } from "./aimV2";
+import type { SignalKind, SignalSource } from "./signalNormalizer";
 
 export type AimDomain = "general" | "finance" | "tech" | "marketing" | "other";
 
@@ -98,25 +98,56 @@ function formatDelta(delta: number): string {
 	return `${sign}${Math.abs(delta).toFixed(4)}`;
 }
 
+function mapSignalToKind(s: AimSignalInput): SignalKind {
+	switch (s.type) {
+		case "peer_validation":
+			return s.value >= 0 ? "peer_endorsement" : "peer_dispute";
+		case "consistency":
+			return s.value >= 0 ? "consistency_match" : "consistency_break";
+		case "reliability":
+			return s.value >= 0 ? "outcome_success" : "outcome_failure";
+		case "contradiction": {
+			const sev = Math.round(Math.abs(s.value));
+			if (sev >= 3) return "challenge_opened_l3";
+			if (sev >= 2) return "challenge_opened_l2";
+			return "challenge_opened_l1";
+		}
+		case "decay":
+			return "inactivity_decay";
+		case "success":
+		default:
+			return s.value >= 0 ? "outcome_success" : "outcome_failure";
+	}
+}
+
+function mapSignalSource(s: AimSignalInput): SignalSource {
+	switch (s.type) {
+		case "peer_validation":
+		case "contradiction":
+			return "peer";
+		case "reliability":
+		case "consistency":
+		case "decay":
+			return "system";
+		default:
+			return "system";
+	}
+}
+
 // ─── AIMEngine class ──────────────────────────────────────────────────────────
 
 export class AIMEngine {
 	async recordSignals(userId: string, signals: AimSignalInput[]) {
 		for (const s of signals) {
-			const mappedType =
-				s.type === "peer_validation" ? "success" :
-				s.type === "consistency" ? "success" :
-				s.type === "reliability" ? "success" :
-				s.type === "contradiction" ? "contradiction" :
-				s.type === "decay" ? "decay" :
-				"success";
-
-			await createAimEvent(userId, mappedType, s.value, s.context);
+			await processAimSignal({
+				userId,
+				kind: mapSignalToKind(s),
+				source: mapSignalSource(s),
+				domain: s.domain,
+				refId: s.context,
+			});
+			// processAimSignal() recomputes with historyContext = signal kind
 		}
-
-		microRecalcQueue.enqueue(userId, async () => {
-			await calculateAimScore(userId);
-		});
 	}
 
 	async getSummary(userId: string) {
