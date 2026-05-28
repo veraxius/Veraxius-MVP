@@ -4,8 +4,11 @@
 
 import { prisma } from "../config/prisma";
 import { classifyPost } from "./domainClassifier";
-import { recomputeAIMScore, getVoterTierMultiplier } from "./aimV2";
+import { recomputeAIMScore, getVoterTierMultiplier, checkContradictionDetected } from "./aimV2";
 import jwt from "jsonwebtoken";
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const AIMCFG = require("../../aim.config.js");
 
 const LAMBDA = 0.05; // recency decay rate
 
@@ -383,7 +386,9 @@ export async function onTrustVote(input: TrustVoteInput): Promise<void> {
 	//   Tier 2 (AIM 0.40–0.74)                    → 0.7×
 	//   Tier 3 (AIM < 0.40 or new account)        → 0.10–0.50× (linear)
 	const tierMultiplier = getVoterTierMultiplier(voterAimScore, voterAimConfidence);
-	const baseRawDelta = isPositive ? 0.025 : -0.025;
+	const baseRawDelta = isPositive
+		? AIMCFG.domain.trustVoteRawDelta
+		: -AIMCFG.domain.trustVoteRawDelta;
 	const scaledDelta  = baseRawDelta * tierMultiplier;          // tier scales the base impact
 	const rawDelta     = isSelfVote ? scaledDelta * 0.2 : scaledDelta; // self-report cap on top
 	const variableWeight = 1.0; // peer_validation weight from spec
@@ -426,10 +431,13 @@ export async function onTrustVote(input: TrustVoteInput): Promise<void> {
 	// 9. Update signal counters and last activity
 	await updateSignalCount(postUserId, domainName, isPositive);
 
-	// 10. Recalculate domain AIM score
+	// 10. Contradiction rule (last 5 publications in domain) — may add domain penalty event
+	await checkContradictionDetected(postUserId, domainName, "domainAimEvent");
+
+	// 11. Recalculate domain AIM score (votes + any contradiction_detected penalty)
 	await recalculateDomainScore(postUserId, domainName);
 
-	// 11. Trigger global AIM recompute (domain scores now feed into globalAIM)
+	// 12. Trigger global AIM recompute (domain scores now feed into globalAIM)
 	await recomputeAIMScore(postUserId, domainName);
 }
 
@@ -499,7 +507,7 @@ export async function runDomainDecay(): Promise<void> {
 
 		// qualityShield reduces decay for high-confidence profiles
 		const qualityShield = Math.min(0.8, ds.domainConfidence);
-		const baseDecayRate = 0.002;
+		const baseDecayRate = AIMCFG.domain.domainDecayBaseRate;
 		const decayAmount = baseDecayRate * (1 - qualityShield);
 
 		// Do not apply decay if there's a severe negative event less than 30 days old
@@ -509,7 +517,7 @@ export async function runDomainDecay(): Promise<void> {
 				userId: ds.userId,
 				domainName: ds.domainName,
 				isReversed: false,
-				effectiveDelta: { lt: -0.05 },
+				effectiveDelta: { lt: AIMCFG.decay.severeNegativeThreshold },
 				createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
 			},
 		});

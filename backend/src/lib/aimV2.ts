@@ -215,6 +215,10 @@ export async function recordOutcome(
 		}),
 		prisma.user.update({ where: { id: userId }, data: { lastActiveAt: now } }),
 	]);
+
+	if (domain) {
+		await checkContradictionDetected(userId, domain, "aimEvent");
+	}
 }
 
 // ─── VARIABLE 2 — CONSISTENCY ────────────────────────────────────────────────
@@ -446,6 +450,8 @@ export interface ProcessSignalInput {
 	antiAbuseMultiplier?: number;
 	/** When true, caller must invoke recomputeAIMScore() after this returns. */
 	deferRecompute?: boolean;
+	/** Extra fields merged into persisted AimEvent.metadata. */
+	extraMetadata?: Record<string, unknown>;
 }
 
 export interface ProcessSignalResult {
@@ -527,6 +533,7 @@ export async function processAimSignal(input: ProcessSignalInput): Promise<Proce
 				sourceCredibilityFactor: ns.sourceCredibilityFactor,
 				...(iKey ? { idempotencyKey: iKey } : {}),
 				...(refId ? { refId } : {}),
+				...(input.extraMetadata ?? {}),
 			},
 		},
 	});
@@ -539,6 +546,216 @@ export async function processAimSignal(input: ProcessSignalInput): Promise<Proce
 }
 
 // ─── VARIABLE 4 — CONTRADICTION ───────────────────────────────────────────────
+
+const CONTRADICTION_WINDOW_SIZE = 5;
+const FAILED_OUTCOME_SIGNALS = new Set(["outcome_failure", "peer_dispute"]);
+export type DomainInteractionSource = "aimEvent" | "domainAimEvent";
+
+interface DomainInteractionRow {
+	/** Stable id for the window (post id or AimEvent id). */
+	id:              string;
+	createdAt:       Date;
+	failed:          boolean;
+	/** DomainAimEvent id for a peer_dispute on this publication, when applicable. */
+	failureEventId?: string;
+}
+
+function isFailedOutcomeSignal(signal: string | null | undefined): boolean {
+	return FAILED_OUTCOME_SIGNALS.has(signal ?? "");
+}
+
+/**
+ * Last N publications by the user in a domain (primary classification).
+ * Failed = publication received at least one active peer_dispute (Not Reliable).
+ */
+async function fetchLastDomainPublications(
+	userId: string,
+	domain: string,
+	limit:  number = CONTRADICTION_WINDOW_SIZE,
+): Promise<DomainInteractionRow[]> {
+	const posts = await prisma.post.findMany({
+		where: {
+			userId,
+			postDomains: { some: { domainName: domain, isPrimary: true } },
+		},
+		orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+		take:    limit,
+		select:  { id: true, createdAt: true },
+	});
+
+	if (!posts.length) return [];
+
+	const postIds = posts.map((p) => p.id);
+	const disputes = await prisma.domainAimEvent.findMany({
+		where: {
+			userId,
+			domainName: domain,
+			postId:     { in: postIds },
+			eventType:  "peer_dispute",
+			isReversed: false,
+		},
+		orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+		select:  { id: true, postId: true },
+	});
+
+	const disputeByPost = new Map<number, string>();
+	for (const d of disputes) {
+		if (d.postId != null && !disputeByPost.has(d.postId)) {
+			disputeByPost.set(d.postId, d.id);
+		}
+	}
+
+	return posts.map((p) => ({
+		id:             String(p.id),
+		createdAt:      p.createdAt,
+		failed:         disputeByPost.has(p.id),
+		failureEventId: disputeByPost.get(p.id),
+	}));
+}
+
+/** Last N domain-tagged AimEvents, newest first. */
+async function fetchLastDomainAimEvents(
+	userId: string,
+	domain: string,
+	limit:  number = CONTRADICTION_WINDOW_SIZE,
+): Promise<DomainInteractionRow[]> {
+	const rows = await prisma.aimEvent.findMany({
+		where:   { userId, domain },
+		orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+		take:    limit,
+		select:  { id: true, createdAt: true, signal: true },
+	});
+	return rows.map((r) => ({
+		id:        r.id,
+		createdAt: r.createdAt,
+		failed:    isFailedOutcomeSignal(r.signal),
+	}));
+}
+
+async function fetchLastDomainInteractions(
+	userId: string,
+	domain: string,
+	source: DomainInteractionSource,
+	limit:  number = CONTRADICTION_WINDOW_SIZE,
+): Promise<DomainInteractionRow[]> {
+	if (source === "domainAimEvent") {
+		return fetchLastDomainPublications(userId, domain, limit);
+	}
+	return fetchLastDomainAimEvents(userId, domain, limit);
+}
+
+async function persistDomainContradictionPenalty(
+	userId: string,
+	domain: string,
+	rawDelta: number,
+): Promise<string> {
+	const domainEvent = await prisma.domainAimEvent.create({
+		data: {
+			userId,
+			domainName:           domain,
+			eventType:            "contradiction_detected",
+			rawDelta,
+			variableWeight:       1.0,
+			recencyFactor:        1.0,
+			contextWeight:        1.0,
+			confidenceMultiplier: 1.0,
+			antiAbuseMultiplier:  1.0,
+			effectiveDelta:       rawDelta,
+		},
+	});
+
+	const { recalculateDomainScore } = await import("./domainScoreService");
+	await recalculateDomainScore(userId, domain);
+
+	return domainEvent.id;
+}
+
+export interface ContradictionCheckResult {
+	triggered:             boolean;
+	failedInteractionIds?: string[];
+	signalEventId?:        string;
+	domainEventId?:        string;
+	reason?:               string;
+}
+
+/**
+ * Canonical contradiction_detected rule (proof-of-mechanics).
+ * When a domain has ≥2 failed outcomes in its last 5 interactions, emit the signal once
+ * per distinct 5-interaction window (idempotent on window IDs).
+ */
+export async function checkContradictionDetected(
+	userId: string,
+	domain: string,
+	source: DomainInteractionSource = "domainAimEvent",
+): Promise<ContradictionCheckResult> {
+	const window = await fetchLastDomainInteractions(userId, domain, source);
+	const failedInWindow = window.filter((r) => r.failed);
+
+	if (failedInWindow.length < 2) {
+		return { triggered: false, reason: "insufficient_failures" };
+	}
+
+	const triggeringFailures = failedInWindow.slice(0, 2);
+	const failedInteractionIds = triggeringFailures.map(
+		(r) => r.failureEventId ?? r.id,
+	);
+
+	const windowKey = window.map((r) => r.id).sort().join(",");
+	const windowPrefix = source === "domainAimEvent" ? "posts" : "events";
+	const idempotencyKey = `contradiction_detected:${domain}:${windowPrefix}:${windowKey}`;
+
+	const existing = await prisma.aimEvent.findFirst({
+		where: {
+			userId,
+			signal:   "contradiction_detected",
+			metadata: { path: ["idempotencyKey"], equals: idempotencyKey },
+		},
+		select: { id: true },
+	});
+	if (existing) {
+		return { triggered: false, reason: "already_emitted", failedInteractionIds };
+	}
+
+	const timestamp = new Date();
+
+	await prisma.event.create({
+		data: {
+			type:   "governance_log",
+			userId,
+			status: "completed",
+			payload: {
+				rule:                 "contradiction_detected",
+				domain,
+				timestamp:            timestamp.toISOString(),
+				failedInteractionIds,
+				signal:               "contradiction_detected",
+				interactionSource:    source,
+				windowInteractionIds: window.map((r) => r.id),
+				windowPrefix,
+			},
+		},
+	});
+
+	const signalResult = await processAimSignal({
+		userId,
+		kind:           "contradiction_detected",
+		source:         "system",
+		domain,
+		idempotencyKey,
+		deferRecompute: true,
+		extraMetadata:  { failedInteractionIds, interactionSource: source, windowPrefix },
+	});
+
+	const ns = normalizeSignal("contradiction_detected", "system");
+	const domainEventId = await persistDomainContradictionPenalty(userId, domain, ns.rawDelta);
+
+	return {
+		triggered:            true,
+		failedInteractionIds,
+		signalEventId:        signalResult.eventId,
+		domainEventId,
+	};
+}
 
 export async function openChallenge(
 	challengerId: string,
@@ -846,7 +1063,11 @@ export async function calculateConfidence(userId: string, verificationFallback: 
 	// ── 4. Recovery damping after failures ────────────────────────────────────
 	const windowSize     = Math.min(20, events.length);
 	const recentEvents   = events.slice(-windowSize);
-	const recentFailures = recentEvents.filter((e: { delta: number }) => e.delta < -0.02).length;
+	const failureThreshold =
+		AIMCFG.confidence.recoveryFailureThreshold ?? -0.2;
+	const recentFailures = recentEvents.filter(
+		(e: { delta: number }) => e.delta < failureThreshold,
+	).length;
 	const negativeRatio  = recentFailures / windowSize;
 	// Apply damping only when >20% of recent signals are negative
 	const recoveryFactor = negativeRatio > 0.2

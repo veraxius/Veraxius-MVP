@@ -95,7 +95,7 @@ function labelForDomainEvent(eventType: string, domainName: string): {
 
 function formatDelta(delta: number): string {
 	const sign = delta >= 0 ? "+" : "−";
-	return `${sign}${Math.abs(delta).toFixed(4)}`;
+	return `${sign}${Math.abs(delta).toFixed(2)}`;
 }
 
 function mapSignalToKind(s: AimSignalInput): SignalKind {

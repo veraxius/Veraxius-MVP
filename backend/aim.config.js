@@ -3,6 +3,9 @@ module.exports = {
   baseScore: 0.50,          // All new users start neutral
   recencyLambda: 0.05,      // Exponential decay: Math.exp(-lambda * daysSince)
 
+  // Score deltas scaled ×10 vs original spec (0.025 → 0.25, 0.02 → 0.20, etc.)
+  deltaScale: 10,
+
   // ─── Context Weight ──────────────────────────────────────────────────────
   // contextWeight = clamp(stakeLevel × roleWeight × platformVerification, 0.75, 1.35)
   contextWeights: {
@@ -51,34 +54,29 @@ module.exports = {
     multiplier: { base: 0.5, span: 0.5 },  // 0.5 + 0.5 × voterScore
 
     // ── Non-linear confidence scaling ──────────────────────────────────────
-    // Friction Initial: new accounts are capped at earlySignalCap until they
-    // have earlySignalThreshold verified signals (prevents instant authority).
-    earlySignalThreshold: 10,   // Signals before early friction lifts
-    earlySignalCap:       0.18, // Hard cap during early phase (0.10 → 0.18 range)
+    earlySignalThreshold: 10,
+    earlySignalCap:       0.18,
 
-    // Compound Consistency: significant jumps (past 0.78) require at least
-    // frictionWindow days of account history.
-    frictionWindow: 45,         // Days of history required for high-confidence tier
+    frictionWindow: 45,
 
-    // Recovery Damping: after a significant failure (delta < -0.02), positive
+    // Recovery Damping: after a significant failure (delta < -0.20), positive
     // signals only restore recoveryDamping fraction of what they normally would.
-    recoveryDamping:      0.50, // 50% recovery rate after failure
+    recoveryDamping:      0.50,
+    recoveryFailureThreshold: -0.20,
 
-    // Multi-Domain Bonus: active in multiple public domains signals depth.
-    multiDomainBonus:     0.05, // +5% per extra active domain (after first)
-    multiDomainBonusCap:  1.20, // Maximum multiplier from domain breadth
+    multiDomainBonus:     0.05,
+    multiDomainBonusCap:  1.20,
   },
 
   // ─── Anti-Abuse Multipliers ──────────────────────────────────────────────
   antiAbuse: {
     normal:      1.0,
-    mild:        0.75,   // 4+ votes in coordination window
-    strong:      0.4,    // 6+ votes in coordination window
-    coordinated: 0.1,    // 8+ burst from same cluster
+    mild:        0.75,
+    strong:      0.4,
+    coordinated: 0.1,
   },
 
   // ─── Core Variable Weights ───────────────────────────────────────────────
-  // variableWeight per AIM master variable (all 1.0 by default, tune as needed)
   variableWeights: {
     reliability:    1.0,
     consistency:    1.0,
@@ -89,105 +87,101 @@ module.exports = {
 
   // ─── Variable 1: Reliability ─────────────────────────────────────────────
   reliability: {
-    baseMultiplier:         0.10,
+    baseMultiplier:         1.0,   // was 0.10 (×10)
     streakBonusMultiplier:  1.3,
     streakPenaltyMultiplier: 1.5,
-    streakBonusWindow:      5,    // last N outcomes must all be > 0.7
-    streakPenaltyWindow:    3,    // last N outcomes must all be < 0.3
-    verifiedBoost:          0.15, // extra quality if third-party verified
+    streakBonusWindow:      5,
+    streakPenaltyWindow:    3,
+    verifiedBoost:          1.5,   // was 0.15 (×10)
   },
 
   // ─── Variable 2: Consistency ─────────────────────────────────────────────
   consistency: {
     weeklyCronHourUTC: 3,
-    breakPenaltyA: -0.04,   // latency deviation
-    matchBonusA:   +0.02,
-    breakPenaltyB: -0.03,   // posting frequency drop
-    breakPenaltyC: -0.05,   // vote pattern instability
-    breakPenaltyD: -0.02,   // claim-action misalignment
-    matchBonusD:   +0.02,   // claim-action alignment
+    breakPenaltyA: -0.40,   // was -0.04
+    matchBonusA:   +0.20,   // was +0.02
+    breakPenaltyB: -0.30,   // was -0.03
+    breakPenaltyC: -0.50,   // was -0.05
+    breakPenaltyD: -0.20,   // was -0.02
+    matchBonusD:   +0.20,   // was +0.02
   },
 
   // ─── Variable 3: Peer Validation ─────────────────────────────────────────
   peerValidation: {
-    // rawDelta before multipliers (spec: ±0.025 per vote)
-    rawDeltaEndorsement:  +0.025,
-    rawDeltaDispute:      -0.025,
+    rawDeltaEndorsement:  +0.25,  // was +0.025
+    rawDeltaDispute:      -0.25,  // was -0.025
 
-    // Network distance factor (low = direct friends, high = strangers; designed to
-    // reduce friend-boosting collusion — strangers' votes are slightly higher-weighted)
     networkDistanceFactor: {
-      direct: 0.60,   // 1st-degree connection — possible bias
-      second: 1.00,   // 2nd-degree — neutral baseline
-      none:   1.30,   // No social connection — most objective
+      direct: 0.60,
+      second: 1.00,
+      none:   1.30,
     },
 
-    // Domain diversity of voter vs target
     diversityFactor: {
-      same:      0.80,   // Same domain — potential echo-chamber
-      different: 1.10,   // Cross-domain — more objective signal
+      same:      0.80,
+      different: 1.10,
     },
 
-    // Rate limits
-    maxReceivedVotes24h:  20,  // Max peer_validation events per user per 24h
-    voteCooldownDays:     7,   // Same voter can't vote on same target within 7d
+    maxReceivedVotes24h:  20,
+    voteCooldownDays:     7,
 
-    // Anti-coordination thresholds (votes received in coordinationWindowHours)
     coordinationWindowHours: 2,
     coordinationBurst: {
-      mild:     4,   // mild suspicion  → antiAbuse 0.75
-      strong:   6,   // strong suspicion → antiAbuse 0.4
-      critical: 8,   // coordinated burst → antiAbuse 0.1
+      mild:     4,
+      strong:   6,
+      critical: 8,
     },
   },
 
   // ─── Variable 4: Contradiction ───────────────────────────────────────────
   contradiction: {
-    level1: { provisional: -0.02 },   // L1 — minor challenge
-    level2: { provisional: -0.04 },   // L2 — moderate challenge
-    level3: { provisional: -0.07 },   // L3 — severe challenge (+ public flag)
+    level1: { provisional: -0.20 },   // was -0.02
+    level2: { provisional: -0.40 },   // was -0.04
+    level3: { provisional: -0.70 },   // was -0.07
 
     resolved: {
-      upheld:   { deepenBy: -0.01 },          // Validated: provisional + deepen
-      dismissed: { reversePercent: 1.00 },     // Reversed: 100% of provisional undone
+      upheld:   { deepenBy: -0.10 },          // was -0.01
+      dismissed: { reversePercent: 1.00 },
       mixed:    { reversePercentMin: 0.30, reversePercentMax: 0.60 },
-      maliciousByAccuser: { penalizeAccuser: -0.03 },  // Challenger penalized
+      maliciousByAccuser: { penalizeAccuser: -0.30 },  // was -0.03
     },
   },
 
   // ─── Variable 5: Decay ───────────────────────────────────────────────────
-  // MVP4 Alignment Document: grace ≤7d, then escalating penalties by inactivity band.
   decay: {
     inactivityThresholdDays: 7,
 
-    baseDailyRate: 0.002,    // 0.2% per day after threshold
+    baseDailyRate: 0.02,    // was 0.002
 
-    // First matching band wins (days inactive). 90+ uses 5.0 or 7.0 in applyDecayToAllUsers().
     timeMultipliers: [
-      { maxDays: 7,        multiplier: 0.0  },  // ≤7 days — no decay
-      { maxDays: 30,       multiplier: 0.75 }, // 8–30 days — light
-      { maxDays: 60,       multiplier: 2.0  }, // 31–60 days — moderate
-      { maxDays: 90,       multiplier: 3.75 }, // 61–90 days — heavy
-      { maxDays: Infinity, multiplier: 5.0  }, // 90+ days — maximum (high-score users)
+      { maxDays: 7,        multiplier: 0.0  },
+      { maxDays: 30,       multiplier: 0.75 },
+      { maxDays: 60,       multiplier: 2.0  },
+      { maxDays: 90,       multiplier: 3.75 },
+      { maxDays: Infinity, multiplier: 5.0  },
     ],
 
-    // qualityShield reduces decay for users with strong historical quality
-    qualityShieldCap: 0.80,   // Max 80% decay reduction from shield
-    decayFloorFactor: 0.30,   // Minimum floor = 30% of current score
-    minFloor: 0.10,           // Absolute minimum score from decay alone
+    qualityShieldCap: 0.80,
+    decayFloorFactor: 0.30,
+    minFloor: 0.10,
+    severeNegativeThreshold: -0.50,  // was -0.05 (domain decay skip)
   },
 
   // ─── Domain thresholds & global blend ───────────────────────────────────
   domain: {
-    minInteractions: 5,     // Domain must have ≥5 interactions to count
-    minConfidence:   0.15,  // Domain confidence must be > 0.15 to count
+    minInteractions: 5,
+    minConfidence:   0.15,
     globalBlend: {
-      generalWeight:        0.75,  // 75% from general events
-      domainCompositeWeight: 0.25, // 25% from weighted domain composite
+      generalWeight:        0.75,
+      domainCompositeWeight: 0.25,
     },
+    trustVoteRawDelta: 0.25,  // was 0.025 (domain trust votes)
+    domainDecayBaseRate: 0.02, // was 0.002
   },
 
+  // ─── Direct post reaction bump (posts route increment) ─────────────────
+  postTrustReactionIncrement: 0.20,  // was 0.02
+
   // ─── Ranking score ───────────────────────────────────────────────────────
-  // rankingScore = AIMScore × (0.55 + 0.45 × confidence)
   rankingBlend: { base: 0.55, boost: 0.45 },
 };

@@ -276,6 +276,7 @@ function PostCard({
   const [text, setText] = useState("");
 
   const me = getAuth()?.user;
+  const isOwnPost = Boolean(me?.id && me.id === post.userId);
   const reactions = post.reactions ?? [];
   const comments = post.comments ?? [];
 
@@ -375,31 +376,35 @@ function PostCard({
               {comments.length > 0 ? "Answers" : "Reply"} {comments.length}
             </button>
 
-            <button
-              type="button"
-              className={cn(
-                "min-h-11 px-3 py-2 rounded border text-sm",
-                reactedReliable
-                  ? "bg-[var(--amber)] text-[var(--bg-primary)] border-[var(--amber)]"
-                  : "border-[var(--divider)] text-secondary hover:bg-white/5"
-              )}
-              onClick={() => onReact(post.id, "confiable")}
-            >
-              Reliable {reliableCount}
-            </button>
+            {!isOwnPost && (
+              <>
+                <button
+                  type="button"
+                  className={cn(
+                    "min-h-11 px-3 py-2 rounded border text-sm",
+                    reactedReliable
+                      ? "bg-[var(--amber)] text-[var(--bg-primary)] border-[var(--amber)]"
+                      : "border-[var(--divider)] text-secondary hover:bg-white/5"
+                  )}
+                  onClick={() => onReact(post.id, "confiable")}
+                >
+                  Reliable {reliableCount}
+                </button>
 
-            <button
-              type="button"
-              className={cn(
-                "min-h-11 px-3 py-2 rounded border text-sm",
-                reactedNotReliable
-                  ? "bg-[var(--red)] text-[var(--bg-primary)] border-[var(--red)]"
-                  : "border-[var(--divider)] text-secondary hover:bg-white/5"
-              )}
-              onClick={() => onReact(post.id, "not_reliable")}
-            >
-              Not reliable {notReliableCount}
-            </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "min-h-11 px-3 py-2 rounded border text-sm",
+                    reactedNotReliable
+                      ? "bg-[var(--red)] text-[var(--bg-primary)] border-[var(--red)]"
+                      : "border-[var(--divider)] text-secondary hover:bg-white/5"
+                  )}
+                  onClick={() => onReact(post.id, "not_reliable")}
+                >
+                  Not reliable {notReliableCount}
+                </button>
+              </>
+            )}
           </div>
 
           {showComments && (

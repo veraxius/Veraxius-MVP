@@ -212,7 +212,7 @@ async function abuse3_challengeHarassment() {
     const ch = await openChallenge(voters[i], target, "spam", 1);
     // mark malicious accuser on resolve positive
     await resolveChallenge(ch.id, "dismissed");
-    await prisma.aimEvent.create({ data: { userId: voters[i], eventType: "contradiction", signal: "malicious_challenge", delta: -0.03, weight: 1, contextWeight: 1 } });
+    await prisma.aimEvent.create({ data: { userId: voters[i], eventType: "contradiction", signal: "malicious_challenge", delta: -0.3, weight: 1, contextWeight: 1 } });
   }
   await recomputeAIMScore(target);
   await logState("After harassment cycle", target);

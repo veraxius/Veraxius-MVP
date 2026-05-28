@@ -41,6 +41,7 @@ export type SignalKind =
 	| "challenge_resolved_dismissed"
 	| "challenge_resolved_mixed"
 	| "challenge_resolved_malicious_penalty"
+	| "contradiction_detected"
 	// Variable 5 — Decay
 	| "inactivity_decay";
 
@@ -81,88 +82,91 @@ type SignalEntry = Omit<NormalizedSignal, "sourceCredibilityFactor">;
  * rawDelta values derived from the Veraxius AIM spec (2026).
  * variableWeight reflects signal importance within its variable bucket.
  */
+/** AIM score deltas (×10 vs original 2026 spec — see aim.config.js deltaScale). */
 const SIGNAL_TABLE: Record<SignalKind, SignalEntry> = {
 	// ── Variable 1: Reliability ────────────────────────────────────────────────
 	outcome_success: {
-		rawDelta: +0.04, variableWeight: 1.0,
+		rawDelta: +0.4, variableWeight: 1.0,
 		eventType: "reliability", signal: "outcome_success",
 	},
 	outcome_failure: {
-		rawDelta: -0.04, variableWeight: 1.0,
+		rawDelta: -0.4, variableWeight: 1.0,
 		eventType: "reliability", signal: "outcome_failure",
 	},
 	repeated_positive_outcome: {
-		rawDelta: +0.02, variableWeight: 1.3,   // streak bonus ×1.3
+		rawDelta: +0.2, variableWeight: 1.3,
 		eventType: "reliability", signal: "repeated_positive_outcome",
 	},
 	repeated_negative_outcome: {
-		rawDelta: -0.03, variableWeight: 1.5,   // streak penalty ×1.5
+		rawDelta: -0.3, variableWeight: 1.5,
 		eventType: "reliability", signal: "repeated_negative_outcome",
 	},
 	claim_verified: {
-		rawDelta: +0.03, variableWeight: 1.2,
+		rawDelta: +0.3, variableWeight: 1.2,
 		eventType: "reliability", signal: "claim_verified",
 	},
 	claim_unverified: {
-		rawDelta: -0.02, variableWeight: 0.8,
+		rawDelta: -0.2, variableWeight: 0.8,
 		eventType: "reliability", signal: "claim_unverified",
 	},
 
 	// ── Variable 2: Consistency ────────────────────────────────────────────────
 	consistency_match: {
-		rawDelta: +0.02, variableWeight: 1.0,
+		rawDelta: +0.2, variableWeight: 1.0,
 		eventType: "consistency", signal: "consistency_match",
 	},
 	consistency_break: {
-		rawDelta: -0.03, variableWeight: 1.0,
+		rawDelta: -0.3, variableWeight: 1.0,
 		eventType: "consistency", signal: "consistency_break",
 	},
 
 	// ── Variable 3: Peer Validation ───────────────────────────────────────────
 	peer_endorsement: {
-		rawDelta: +0.025, variableWeight: 1.0,
+		rawDelta: +0.25, variableWeight: 1.0,
 		eventType: "peer_validation", signal: "peer_endorsement",
 	},
 	peer_dispute: {
-		rawDelta: -0.025, variableWeight: 1.0,
+		rawDelta: -0.25, variableWeight: 1.0,
 		eventType: "peer_validation", signal: "peer_dispute",
 	},
 
 	// ── Variable 4: Contradiction ──────────────────────────────────────────────
 	challenge_opened_l1: {
-		rawDelta: -0.02, variableWeight: 1.0,   // L1 minor provisional
+		rawDelta: -0.2, variableWeight: 1.0,
 		eventType: "contradiction", signal: "challenge_opened_l1",
 	},
 	challenge_opened_l2: {
-		rawDelta: -0.04, variableWeight: 1.0,   // L2 moderate provisional
+		rawDelta: -0.4, variableWeight: 1.0,
 		eventType: "contradiction", signal: "challenge_opened_l2",
 	},
 	challenge_opened_l3: {
-		rawDelta: -0.07, variableWeight: 1.0,   // L3 severe provisional + public flag
+		rawDelta: -0.7, variableWeight: 1.0,
 		eventType: "contradiction", signal: "challenge_opened_l3",
 	},
 	challenge_resolved_upheld: {
-		rawDelta: -0.01, variableWeight: 1.0,   // deepens penalty after validation
+		rawDelta: -0.1, variableWeight: 1.0,
 		eventType: "contradiction", signal: "challenge_resolved_upheld",
 	},
-	/** rawDelta is 0 here — actual reversal delta is computed dynamically in resolveChallenge */
 	challenge_resolved_dismissed: {
 		rawDelta: 0, variableWeight: 1.0,
 		eventType: "contradiction", signal: "challenge_resolved_dismissed",
 	},
-	/** rawDelta is 0 here — actual partial reversal delta is computed dynamically */
 	challenge_resolved_mixed: {
 		rawDelta: 0, variableWeight: 1.0,
 		eventType: "contradiction", signal: "challenge_resolved_mixed",
 	},
 	challenge_resolved_malicious_penalty: {
-		rawDelta: -0.03, variableWeight: 1.0,   // challenger penalized for malicious challenge
+		rawDelta: -0.3, variableWeight: 1.0,
 		eventType: "contradiction", signal: "challenge_malicious_accusation",
+	},
+	contradiction_detected: {
+		rawDelta: -0.2, variableWeight: 1.0,
+		eventType: "contradiction", signal: "contradiction_detected",
 	},
 
 	// ── Variable 5: Decay ─────────────────────────────────────────────────────
 	inactivity_decay: {
-		rawDelta: -0.002, variableWeight: 1.0,  // base daily decay rate
+		rawDelta: -0.02, variableWeight: 1.0,
 		eventType: "decay", signal: "inactivity_decay",
 	},
 };

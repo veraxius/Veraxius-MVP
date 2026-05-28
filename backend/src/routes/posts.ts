@@ -7,6 +7,10 @@ import { onPostCreated, onPostDeleted } from "../lib/domainScoreService";
 import { processPendingEvents } from "../lib/eventProcessor";
 import { zContent, invalidPayload, internalError } from "../lib/validation";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const AIMCFG = require("../../aim.config.js");
+const POST_TRUST_DELTA = AIMCFG.postTrustReactionIncrement ?? 0.2;
+
 const router = Router();
 
 const CreatePostSchema = z.object({
@@ -109,7 +113,7 @@ router.post("/:id/react", requireAuth, async (req, res) => {
           where: { id: authorUserId },
           data: {
             aimScore: {
-              increment: type === "confiable" ? -0.02 : 0.02,
+              increment: type === "confiable" ? -POST_TRUST_DELTA : POST_TRUST_DELTA,
             },
           },
         });
@@ -183,7 +187,7 @@ router.post("/:id/react", requireAuth, async (req, res) => {
         where: { id: authorUserId },
         data: {
           aimScore: {
-            increment: type === "confiable" ? 0.02 : -0.02,
+            increment: type === "confiable" ? POST_TRUST_DELTA : -POST_TRUST_DELTA,
           },
         },
       });
