@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import {
+	aimGaugeFillFraction,
 	formatAimScoreLabel,
 	normalizeAimFraction,
 	riskBadgeClass,
@@ -24,39 +25,52 @@ function GaugeRing({
 	aimFraction: number;
 	colorClass: string;
 }) {
-	const f = normalizeAimFraction(aimFraction);
+	const score = normalizeAimFraction(aimFraction);
+	const fillRatio = aimGaugeFillFraction(aimFraction);
 	const size = 180;
 	const stroke = 12;
 	const radius = (size - stroke) / 2;
 	const circumference = 2 * Math.PI * radius;
-	const dash = f * circumference;
+	const dashoffset = circumference * (1 - fillRatio);
+	const center = size / 2;
 
 	return (
-		<div className={cn("relative", colorClass)} style={{ width: size, height: size }}>
-			<svg width={size} height={size} aria-hidden>
+		<div
+			className={cn(
+				"relative aspect-square w-full max-w-[140px] sm:max-w-[160px] md:max-w-[180px] mx-auto",
+				colorClass,
+			)}
+		>
+			<svg
+				className="w-full h-full"
+				viewBox={`0 0 ${size} ${size}`}
+				preserveAspectRatio="xMidYMid meet"
+				aria-hidden
+			>
 				<circle
-					cx={size / 2}
-					cy={size / 2}
+					cx={center}
+					cy={center}
 					r={radius}
 					stroke="var(--bg-panel)"
 					strokeWidth={stroke}
 					fill="none"
 				/>
 				<circle
-					cx={size / 2}
-					cy={size / 2}
+					cx={center}
+					cy={center}
 					r={radius}
 					stroke="currentColor"
 					strokeWidth={stroke}
 					fill="none"
 					strokeLinecap="round"
-					strokeDasharray={`${dash} ${circumference - dash}`}
-					transform={`rotate(-90 ${size / 2} ${size / 2})`}
+					strokeDasharray={circumference}
+					strokeDashoffset={dashoffset}
+					transform={`rotate(-90 ${center} ${center})`}
 				/>
 			</svg>
-			<div className="absolute inset-0 flex flex-col items-center justify-center">
-				<div className="text-2xl sm:text-3xl font-bold tabular-nums">
-					{formatAimScoreLabel(f)}
+			<div className="absolute inset-0 flex flex-col items-center justify-center px-2">
+				<div className="text-xl sm:text-2xl md:text-3xl font-bold tabular-nums">
+					{formatAimScoreLabel(score)}
 				</div>
 				<div className="text-xs text-[var(--text-secondary)] mt-1">AIM Score</div>
 			</div>
@@ -85,12 +99,12 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 		return (
 			<div
 				className={cn(
-					"w-full rounded-2xl border border-vx-divider bg-vx-panel p-6 md:p-8 animate-pulse",
+					"w-full rounded-2xl border border-vx-divider bg-vx-panel p-4 sm:p-6 md:p-8 animate-pulse",
 					className,
 				)}
 			>
 				<div className="flex flex-col md:flex-row items-center gap-8">
-					<div className="h-44 w-44 rounded-full bg-vx-divider shrink-0" />
+					<div className="h-36 w-36 sm:h-44 sm:w-44 rounded-full bg-vx-divider shrink-0 mx-auto" />
 					<div className="flex-1 space-y-3 w-full max-w-md">
 						<div className="h-4 w-48 rounded bg-vx-divider" />
 						<div className="h-10 w-full rounded bg-vx-divider" />
@@ -119,7 +133,7 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 				<button
 					type="button"
 					onClick={() => void refresh()}
-					className="vx-btn-primary rounded-lg px-5 py-2 text-sm font-semibold"
+					className="vx-btn-primary rounded-lg px-5 min-h-11 text-sm font-semibold"
 				>
 					Retry
 				</button>
@@ -130,19 +144,19 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 	return (
 		<div
 			className={cn(
-				"w-full rounded-2xl border border-vx-divider bg-vx-panel p-6 md:p-8 shadow-sm",
+				"w-full rounded-2xl border border-vx-divider bg-vx-panel p-4 sm:p-6 md:p-8 shadow-sm",
 				className,
 			)}
 		>
-			<div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-8">
-				<div className="flex flex-col items-center shrink-0">
+			<div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
+				<div className="flex flex-col items-center shrink-0 w-full md:w-auto">
 					<GaugeRing
 						aimFraction={summary.global_score}
 						colorClass={riskGaugeColorClass(summary.risk_level)}
 					/>
 				</div>
 
-				<div className="flex-1 w-full max-w-xl space-y-4">
+				<div className="flex-1 w-full min-w-0 space-y-3 sm:space-y-4 text-center md:text-left">
 					<div>
 						<p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
 							Account

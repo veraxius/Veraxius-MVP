@@ -50,13 +50,13 @@ export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target
 	}, [q, search]);
 
 	return (
-		<div ref={ref} className="relative p-3 border-b border-[var(--divider)]">
+		<div ref={ref} className="relative p-3 sm:p-4 border-b border-[var(--divider)] shrink-0">
 			<input
 				value={q}
 				onChange={(e) => setQ(e.target.value)}
 				placeholder="Search by email..."
 				className={cn(
-					"w-full rounded-lg border bg-transparent px-4 py-3 outline-none",
+					"w-full rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
 					"border-[var(--divider)] focus:border-[var(--amber-border)]",
 					"text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
 				)}
@@ -74,7 +74,7 @@ export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target
 									setOpen(false);
 									setQ("");
 								}}
-								className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-[var(--divider)] last:border-b-0"
+								className="w-full text-left px-4 py-3 min-h-11 hover:bg-white/5 border-b border-[var(--divider)] last:border-b-0"
 							>
 								<p className="vx-body text-primary">{u.email}</p>
 							</button>

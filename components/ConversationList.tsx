@@ -85,12 +85,12 @@ export function ConversationList({
 						key={c.id}
 						onClick={() => onSelect(c.id)}
 						className={cn(
-							"w-full text-left px-4 py-3 border-b border-[var(--divider)] hover:bg-white/5",
+							"w-full text-left px-4 py-3 min-h-11 border-b border-[var(--divider)] hover:bg-white/5",
 							activeId === c.id ? "bg-white/10" : ""
 						)}
 					>
-						<div className="flex items-center justify-between">
-							<p className="vx-body text-primary">{other?.email || "Unknown"}</p>
+						<div className="flex items-center justify-between gap-2 min-w-0">
+							<p className="vx-body text-primary truncate min-w-0">{other?.email || "Unknown"}</p>
 							<span className="vx-mono-sm text-tertiary">{time}</span>
 						</div>
 						<p className="vx-body-sm text-tertiary mt-1">{preview}</p>

@@ -55,7 +55,7 @@ export function EarlyAccessSection() {
       style={{ backgroundColor: "var(--bg-secondary)" }}
     >
       <div className="vx-container">
-        <div className="max-w-[600px] mx-auto text-center">
+        <div className="w-full max-w-xl mx-auto text-center">
 
           {/* Eyebrow */}
           <motion.div
@@ -185,7 +185,7 @@ export function EarlyAccessSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.52, ease: [0.25, 0.1, 0.25, 1] }}
-            className="mt-8 max-w-[480px] mx-auto"
+            className="mt-8 w-full max-w-md mx-auto"
           >
             {status === "success" ? (
               <div

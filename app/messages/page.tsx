@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import { ConversationList } from "@/components/ConversationList";
 import { ConversationSearch } from "@/components/ConversationSearch";
 import { ChatWindow } from "@/components/ChatWindow";
+import { cn } from "@/lib/utils";
 
 export default function MessagesPage() {
 	const router = useRouter();
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [selectedTarget, setSelectedTarget] = useState<{ id: string; email: string; name?: string } | null>(null);
 	const [refreshToken, setRefreshToken] = useState(0);
+	const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
 	useEffect(() => {
 		const auth = getAuth();
@@ -21,50 +23,91 @@ export default function MessagesPage() {
 		}
 	}, [router]);
 
+	const hasChat = Boolean(selectedId || selectedTarget);
+
+	function openConversation(id: string) {
+		setSelectedId(id);
+		setSelectedTarget(null);
+		setMobileView("chat");
+	}
+
+	function openTarget(target: { id: string; email: string; name?: string }) {
+		setSelectedTarget(target);
+		setSelectedId(null);
+		setMobileView("chat");
+	}
+
 	return (
 		<main
-			className="h-screen w-full"
+			className="h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] w-full min-w-0 overflow-hidden"
 			style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
 		>
-			<div className="h-full w-full flex">
-				{/* Left column: sidebar */}
-				<div className="w-[320px] h-full border-r border-[var(--divider)] flex flex-col">
-					<div className="p-3 flex items-center justify-center border-b border-[var(--divider)]">
-						<h2 className="vx-h4 text-center w-full">Chats</h2>
+			<div className="h-full w-full flex flex-col md:flex-row min-w-0">
+				{/* Conversation list */}
+				<div
+					className={cn(
+						"w-full md:w-80 lg:w-80 shrink-0 h-full min-h-0 flex flex-col border-b md:border-b-0 md:border-r border-[var(--divider)]",
+						mobileView === "chat" ? "hidden md:flex" : "flex",
+					)}
+				>
+					<div className="p-3 sm:p-4 flex items-center justify-center border-b border-[var(--divider)] shrink-0">
+						<h2 className="text-base sm:text-lg font-semibold text-center w-full">Chats</h2>
 					</div>
 					<ConversationSearch
 						onSelectTarget={(target) => {
-							setSelectedTarget(target);
-							setSelectedId(null);
+							openTarget(target);
 						}}
 					/>
-					<ConversationList
-						activeId={selectedId}
-						onSelect={(id) => setSelectedId(id)}
-						refreshToken={refreshToken}
-					/>
+					<div className="flex-1 min-h-0 overflow-y-auto">
+						<ConversationList
+							activeId={selectedId}
+							onSelect={openConversation}
+							refreshToken={refreshToken}
+						/>
+					</div>
 				</div>
 
-				{/* Right column: chat */}
-				<div className="flex-1 h-full p-6">
-					{selectedId ? (
-						<ChatWindow conversationId={selectedId} />
-					) : selectedTarget ? (
-						<ChatWindow
-							targetUserId={selectedTarget.id}
-							targetEmail={selectedTarget.email}
-							targetName={selectedTarget.name}
-							onConversationCreated={(conv) => {
-								setSelectedId(conv.id);
-								setSelectedTarget(null);
-								setRefreshToken((x) => x + 1);
-							}}
-						/>
-					) : (
-						<div className="h-full flex items-center justify-center">
-							<p className="vx-body text-tertiary">Select a chat to get started</p>
+				{/* Chat panel */}
+				<div
+					className={cn(
+						"flex-1 min-w-0 min-h-0 flex flex-col",
+						mobileView === "list" ? "hidden md:flex" : "flex",
+					)}
+				>
+					{mobileView === "chat" && (
+						<div className="md:hidden shrink-0 px-4 py-2 border-b border-[var(--divider)]">
+							<button
+								type="button"
+								onClick={() => setMobileView("list")}
+								className="min-h-11 px-3 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+							>
+								← Back to chats
+							</button>
 						</div>
 					)}
+					<div className="flex-1 min-h-0 p-4 sm:p-6">
+						{selectedId ? (
+							<ChatWindow conversationId={selectedId} />
+						) : selectedTarget ? (
+							<ChatWindow
+								targetUserId={selectedTarget.id}
+								targetEmail={selectedTarget.email}
+								targetName={selectedTarget.name}
+								onConversationCreated={(conv) => {
+									setSelectedId(conv.id);
+									setSelectedTarget(null);
+									setRefreshToken((x) => x + 1);
+									setMobileView("chat");
+								}}
+							/>
+						) : (
+							<div className="h-full flex items-center justify-center px-4">
+								<p className="text-sm sm:text-base text-center text-[var(--text-tertiary)]">
+									Select a chat to get started
+								</p>
+							</div>
+						)}
+					</div>
 				</div>
 			</div>
 		</main>

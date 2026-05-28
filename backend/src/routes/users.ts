@@ -77,11 +77,20 @@ router.get("/:userId/aim-summary", async (req, res) => {
 		if (!user) return res.status(404).json({ error: "User not found" });
 
 		const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-		const history30 = await prisma.aimScoreHistory.findMany({
+		// All rows in the 30-day window, ASC — no take/limit cap.
+		let history30 = await prisma.aimScoreHistory.findMany({
 			where: { userId, createdAt: { gte: thirtyDaysAgo } },
 			orderBy: { createdAt: "asc" },
 			select: { score: true, createdAt: true },
 		});
+		// If nothing recent, still return full user history so the chart can plot movement.
+		if (history30.length < 2) {
+			history30 = await prisma.aimScoreHistory.findMany({
+				where: { userId },
+				orderBy: { createdAt: "asc" },
+				select: { score: true, createdAt: true },
+			});
+		}
 
 		const fraction = Number(user.aimScore);
 		const global_score = Math.round(fraction * 1000) / 1000;
@@ -129,8 +138,8 @@ router.get("/:userId/aim-summary", async (req, res) => {
 			trend_delta_30d,
 			top_drivers,
 			history_30d: history30.map((h) => ({
-				score: h.score,
-				created_at: h.createdAt.toISOString(),
+				score: Number(h.score),
+				createdAt: h.createdAt.toISOString(),
 			})),
 		});
 	} catch (err) {

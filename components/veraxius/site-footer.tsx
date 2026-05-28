@@ -20,7 +20,7 @@ export function SiteFooter() {
       <div className="vx-container">
 
         {/* Closing statement */}
-        <div className="max-w-[520px]">
+        <div className="w-full max-w-lg">
 
           {/* Headline — two lines, each as its own statement */}
           <motion.p

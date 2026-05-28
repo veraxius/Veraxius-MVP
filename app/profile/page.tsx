@@ -15,7 +15,9 @@ export default function ProfileIndexPage() {
 
 	return (
 		<AuthGuard>
-			<div className="max-w-3xl mx-auto p-6 text-[var(--text-secondary)]">Cargando…</div>
+			<div className="w-full max-w-3xl mx-auto min-w-0 px-4 py-6 sm:px-6 lg:px-8 text-sm sm:text-base text-[var(--text-secondary)]">
+				Loading…
+			</div>
 		</AuthGuard>
 	);
 }

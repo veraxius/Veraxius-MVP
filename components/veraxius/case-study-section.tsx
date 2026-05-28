@@ -324,12 +324,12 @@ export function CaseStudySection() {
             {/* Column A */}
             <div>
               <p
-                className="font-dm-mono text-[14px] uppercase mb-4 max-w-[620px] mx-auto text-left"
+                className="font-dm-mono text-[14px] uppercase mb-4 w-full max-w-2xl mx-auto text-left"
                 style={{ letterSpacing: "0.18em", color: "var(--red)", textShadow: "0 0 10px rgba(255,107,87,0.2)" }}
               >
                 Where this breaks today
               </p>
-              <ul className="space-y-2 max-w-[620px] mx-auto" style={{ listStyle: "none", padding: 0 }}>
+              <ul className="space-y-2 w-full max-w-2xl mx-auto" style={{ listStyle: "none", padding: 0 }}>
                 {[
                   "Hiring decisions → resume vs real execution",
                   "Subject matter experts → claims vs proven outcomes",
@@ -351,12 +351,12 @@ export function CaseStudySection() {
             {/* Column B */}
             <div>
               <p
-                className="font-dm-mono text-[14px] uppercase mb-4 max-w-[560px] mx-auto text-left"
+                className="font-dm-mono text-[14px] uppercase mb-4 w-full max-w-xl mx-auto text-left"
                 style={{ letterSpacing: "0.18em", color: "var(--amber)", textShadow: "0 0 10px rgba(255,185,0,0.2)" }}
               >
                 What Veraxius changes
               </p>
-              <ul className="space-y-2 max-w-[560px] mx-auto" style={{ listStyle: "none", padding: 0 }}>
+              <ul className="space-y-2 w-full max-w-xl mx-auto" style={{ listStyle: "none", padding: 0 }}>
                 {[
                   "Claims are not trusted",
                   "Claims are tested",

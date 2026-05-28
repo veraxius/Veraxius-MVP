@@ -153,9 +153,7 @@ function DomainRow({
 			href={`/profile/${userId}#${anchorId}`}
 			id={anchorId}
 			scroll={false}
-			className={`block px-5 py-4 flex flex-col gap-2.5 transition-colors hover:bg-white/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-amber/50 rounded-none ${
-				!isLast ? "border-b border-vx-divider" : ""
-			}`}
+			className="block h-full px-4 py-4 sm:px-5 sm:py-4 flex flex-col gap-2.5 rounded-xl border border-vx-divider bg-vx-panel transition-colors hover:bg-white/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-amber/50 min-w-0"
 		>
 			{/* Top row: icon + name | signals + trend */}
 			<div className="flex items-center justify-between gap-3">
@@ -334,10 +332,10 @@ export default function ProfileDomains({
 	const hasMore = publicDomains.length > MAX_VISIBLE;
 
 	return (
-		<div className="space-y-4" id="profile-domains">
+		<div className="space-y-4 w-full min-w-0" id="profile-domains">
 			{/* Header */}
-			<div className="flex items-center justify-between">
-				<h2 className="text-xl font-semibold">Domains</h2>
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<h2 className="text-lg sm:text-xl font-semibold">Domains</h2>
 				{hasMore && (
 					<button
 						onClick={() => setShowAll((v) => !v)}
@@ -350,14 +348,9 @@ export default function ProfileDomains({
 
 			{/* ── Public domain rows — single box ──────────────────────────── */}
 			{hasPublic ? (
-				<div className="border border-vx-divider rounded-xl bg-vx-panel overflow-hidden">
-					{visibleDomains.map((d, idx) => (
-						<DomainRow
-							key={d.domain_name}
-							userId={userId}
-							domain={d}
-							isLast={idx === visibleDomains.length - 1}
-						/>
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+					{visibleDomains.map((d) => (
+						<DomainRow key={d.domain_name} userId={userId} domain={d} />
 					))}
 				</div>
 			) : (

@@ -218,9 +218,9 @@ export default function ChallengePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 space-y-10 text-white">
-      <section className="border border-vx-divider rounded-xl p-6 space-y-4 bg-vx-panel">
-        <h1 className="text-2xl font-bold">Open a Challenge</h1>
+    <div className="w-full max-w-4xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-8 sm:space-y-10 text-white">
+      <section className="border border-vx-divider rounded-xl p-4 sm:p-6 space-y-4 bg-vx-panel">
+        <h1 className="text-xl sm:text-2xl font-bold">Open a Challenge</h1>
         <p className="text-sm text-gray-400">
           Flag an interaction or user behaviour for review.
         </p>
@@ -234,7 +234,7 @@ export default function ChallengePage() {
               value={targetUserId}
               onChange={(e) => setTargetUserId(e.target.value)}
               placeholder="Enter target user ID"
-              className="mt-1 w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2 text-sm focus:outline-none focus:border-vx-amber"
+              className="mt-1 w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
             />
           </div>
 
@@ -247,7 +247,7 @@ export default function ChallengePage() {
               onChange={(e) => setReason(e.target.value)}
               placeholder="Describe why you are raising this challenge..."
               rows={3}
-              className="mt-1 w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2 text-sm focus:outline-none focus:border-vx-amber"
+              className="mt-1 w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
             />
           </div>
 
@@ -255,13 +255,13 @@ export default function ChallengePage() {
             <label className="text-xs text-gray-400 uppercase tracking-wide">
               Severity
             </label>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-1 flex flex-wrap gap-2">
               {([1, 2, 3] as const).map((s) => (
                 <button
                   type="button"
                   key={s}
                   onClick={() => setSeverity(s)}
-                  className={`px-4 py-1.5 rounded border text-sm font-medium ${
+                  className={`min-h-11 px-4 py-2 rounded border text-sm font-medium ${
                     severity === s
                       ? "bg-vx-amber text-black border-vx-amber"
                       : "text-gray-400 border-gray-600 hover:border-gray-400"
@@ -276,7 +276,7 @@ export default function ChallengePage() {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-vx-amber text-black font-semibold text-sm hover:opacity-90 disabled:opacity-50"
+            className="w-full min-h-11 py-2.5 rounded-lg bg-vx-amber text-black font-semibold text-sm hover:opacity-90 disabled:opacity-50"
           >
             {loading ? "Submitting..." : "Submit Challenge"}
           </button>
@@ -289,23 +289,24 @@ export default function ChallengePage() {
         </div>
       </section>
 
-      <section className="border border-vx-divider rounded-xl p-6 space-y-4 bg-vx-panel">
-        <h2 className="text-xl font-bold">View Challenges</h2>
+      <section className="border border-vx-divider rounded-xl p-4 sm:p-6 space-y-4 bg-vx-panel">
+        <h2 className="text-lg sm:text-xl font-bold">View Challenges</h2>
         <p className="text-sm text-gray-400">
           Enter a user ID to view challenges opened by or against that user.
         </p>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             value={listUserId}
             onChange={(e) => setListUserId(e.target.value)}
             placeholder="Enter user ID"
-            className="flex-1 rounded-md border border-vx-divider bg-black/30 px-3 py-2 text-sm focus:outline-none focus:border-vx-amber"
+            className="flex-1 min-w-0 rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
           />
           <button
+            type="button"
             onClick={handleLoadChallenges}
             disabled={listLoading}
-            className="px-5 py-2 rounded-lg bg-vx-amber text-black font-semibold text-sm hover:opacity-90 disabled:opacity-50"
+            className="min-h-11 px-5 py-2 rounded-lg bg-vx-amber text-black font-semibold text-sm hover:opacity-90 disabled:opacity-50 shrink-0"
           >
             {listLoading ? "Loading..." : "Load"}
           </button>
@@ -428,7 +429,7 @@ export default function ChallengePage() {
                   e.target.value as "upheld" | "dismissed" | "mixed" | "malicious"
                 )
               }
-              className="w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2 text-sm focus:outline-none focus:border-vx-amber"
+              className="w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
             >
               <option value="upheld">upheld</option>
               <option value="dismissed">dismissed</option>
@@ -439,7 +440,7 @@ export default function ChallengePage() {
             <button
               onClick={handleResolve}
               disabled={resolveLoading}
-              className="w-full py-2.5 rounded-lg bg-vx-amber text-black font-semibold text-sm hover:opacity-90 disabled:opacity-50"
+              className="w-full min-h-11 py-2.5 rounded-lg bg-vx-amber text-black font-semibold text-sm hover:opacity-90 disabled:opacity-50"
             >
               {resolveLoading ? "Resolving..." : "Resolve Challenge"}
             </button>

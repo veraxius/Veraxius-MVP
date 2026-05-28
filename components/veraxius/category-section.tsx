@@ -20,7 +20,7 @@ export function CategorySection() {
       }}
     >
       <div className="vx-container">
-        <div className="max-w-[860px] mx-auto text-center">
+        <div className="w-full max-w-4xl mx-auto text-center">
           {/* Eyebrow */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}

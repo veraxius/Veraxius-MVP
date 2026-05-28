@@ -67,17 +67,7 @@ body::before {
 @layer components {
   /* Container with exact specs: max-width 1100px, 48px horizontal padding */
   .vx-container {
-    @apply mx-auto w-full;
-    max-width: 1100px;
-    padding-left: 48px;
-    padding-right: 48px;
-  }
-
-  @media (max-width: 768px) {
-    .vx-container {
-      padding-left: 20px;
-      padding-right: 20px;
-    }
+    @apply mx-auto w-full max-w-[1100px] px-4 sm:px-6 lg:px-8;
   }
 
   /* Section with exact padding: 120px top and bottom */
@@ -206,10 +196,17 @@ body::before {
     letter-spacing: 0.08em;
     background-color: var(--amber);
     color: var(--bg-primary);
-    padding: 16px 32px;
+    min-height: 2.75rem;
+    padding: 0.75rem 1.25rem;
     border: none;
     cursor: pointer;
     transition: background-color 0.25s ease;
+  }
+
+  @media (min-width: 640px) {
+    .vx-btn-primary {
+      padding: 1rem 2rem;
+    }
   }
 
   .vx-btn-primary:hover {

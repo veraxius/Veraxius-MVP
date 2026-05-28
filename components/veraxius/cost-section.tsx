@@ -25,7 +25,7 @@ export function CostSection() {
       style={{ backgroundColor: "var(--bg-primary)" }}
     >
       <div className="vx-container">
-        <div className="max-w-[640px] mx-auto text-center">
+        <div className="w-full max-w-2xl mx-auto text-center">
 
           {/* Eyebrow */}
           <motion.div

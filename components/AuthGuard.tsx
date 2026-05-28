@@ -24,7 +24,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
 	if (allowed === null) {
 		return (
-			<div className="min-h-[40vh] flex items-center justify-center px-6 text-[var(--text-secondary)]">
+			<div className="min-h-[40vh] flex items-center justify-center px-4 sm:px-6 text-sm sm:text-base text-[var(--text-secondary)]">
 				Loading…
 			</div>
 		);
@@ -32,9 +32,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
 	if (!allowed) {
 		return (
-			<div className="min-h-[40vh] flex flex-col items-center justify-center gap-3 px-6">
+			<div className="min-h-[40vh] flex flex-col items-center justify-center gap-3 px-4 sm:px-6">
 				<p className="text-[var(--text-secondary)]">Redirecting to sign in…</p>
-				<Link href="/login" className="text-amber underline">
+				<Link href="/login" className="min-h-11 inline-flex items-center text-amber underline">
 					Go to login
 				</Link>
 			</div>

@@ -22,6 +22,16 @@ export function aimFractionToPercent(fraction: number): number {
 	return Math.round(Math.min(100, Math.max(0, f * 100)) * 100) / 100;
 }
 
+/**
+ * Ring fill matches the label number as % of 100 (0.42% → 0.42% of the arc).
+ * Stored 1.0 ("1.00%" label) → full circle.
+ */
+export function aimGaugeFillFraction(raw: number): number {
+	const f = normalizeAimFraction(raw);
+	if (f >= 1) return 1;
+	return f / 100;
+}
+
 export type RiskLevel = "low" | "moderate" | "high" | "critical";
 
 /**

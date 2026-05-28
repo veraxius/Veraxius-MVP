@@ -139,9 +139,9 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 	}
 
 	return (
-		<div className="flex h-full flex-col rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)]">
+		<div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] overflow-hidden">
 			{/* Top navbar inside chat with peer identity */}
-			<div className="h-12 px-4 border-b border-[var(--divider)] flex items-center justify-between">
+			<div className="min-h-12 px-4 py-2 border-b border-[var(--divider)] flex items-center justify-between shrink-0">
 				<div className="flex items-center gap-2 min-w-0">
 					<div
 						className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
@@ -164,7 +164,7 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 					>
 						<div
 							className={cn(
-								"inline-block max-w-[70%] rounded-lg px-3 py-2",
+								"inline-block max-w-[min(85%,20rem)] sm:max-w-[70%] rounded-lg px-3 py-2 break-words",
 								m.senderId === meId
 									? "bg-[var(--amber)] text-[var(--bg-primary)]"
 									: "border border-[var(--divider)] text-[var(--text-primary)]"
@@ -186,7 +186,7 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 					<p className="vx-body-sm text-tertiary">typing...</p>
 				)}
 			</div>
-			<div className="border-t border-[var(--divider)] p-3 flex gap-2">
+			<div className="border-t border-[var(--divider)] p-3 flex gap-2 shrink-0 min-w-0">
 				<input
 					value={input}
 					onChange={(e) => handleTyping(e.target.value)}
@@ -195,14 +195,15 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 					}}
 					placeholder="Type a message..."
 					className={cn(
-						"flex-1 rounded-lg border bg-transparent px-4 py-3 outline-none",
+						"flex-1 min-w-0 rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
 						"border-[var(--divider)] focus:border-[var(--amber-border)]",
 						"text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
 					)}
 				/>
 				<button
+					type="button"
 					onClick={handleSend}
-					className="vx-btn-primary rounded-lg px-5"
+					className="vx-btn-primary rounded-lg px-5 min-h-11 shrink-0 text-sm font-semibold"
 				>
 					Send
 				</button>

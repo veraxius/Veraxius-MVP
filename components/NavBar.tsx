@@ -6,16 +6,21 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { clearAuth, getAuth } from "@/lib/auth";
 import { formatAimScoreLabel } from "@/lib/aimDisplay";
-
 export function NavBar() {
 	const pathname = usePathname();
 	const router = useRouter();
+	const [aim, setAim] = useState<{ score: number; status: string } | null>(null);
+	const [menuOpen, setMenuOpen] = useState(false);
+
 	if (pathname === "/login" || pathname === "/register") return null;
 
 	const isHome = pathname === "/home" || pathname === "/";
 	const isMessages = pathname === "/messages";
 	const showActions = isHome || isMessages;
-	const [aim, setAim] = useState<{ score: number; status: string } | null>(null);
+
+	useEffect(() => {
+		setMenuOpen(false);
+	}, [pathname]);
 
 	useEffect(() => {
 		const auth = getAuth();
@@ -48,32 +53,38 @@ export function NavBar() {
 		};
 	}, [pathname]);
 
+	function handleSignOut() {
+		clearAuth();
+		router.replace("/login");
+		router.refresh();
+	}
+
 	return (
 		<header
-			className="w-full"
+			className="w-full sticky top-0 z-40"
 			style={{ backgroundColor: "var(--bg-panel)", borderBottom: "0.1px solid var(--amber)" }}
 		>
-			<div className="w-full pl-2 pr-2 sm:pl-4 sm:pr-4">
-				<div className="h-14 flex items-center">
-					<div className="flex items-center ml-2 sm:ml-3">
-						<Link href="/home" aria-label="Veraxius Home" className="inline-flex items-center">
-							<Image
-								src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
-								alt="Veraxius"
-								width={140}
-								height={28}
-								className="h-7 w-auto"
-								priority
-							/>
-						</Link>
-					</div>
-					<div className="flex items-center gap-2 ml-auto mr-0">
-						{showActions ? (
-							<>
+			<div className="w-full max-w-[100vw] px-4 sm:px-6 lg:px-8">
+				<div className="h-14 sm:h-16 flex items-center gap-2 min-w-0">
+					<Link href="/home" aria-label="Veraxius Home" className="inline-flex items-center shrink-0 min-h-11">
+						<Image
+							src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
+							alt="Veraxius"
+							width={140}
+							height={28}
+							className="h-6 w-auto sm:h-7 max-w-[120px] sm:max-w-[140px]"
+							priority
+						/>
+					</Link>
+
+					{showActions && (
+						<>
+							{/* Desktop / tablet actions */}
+							<div className="hidden md:flex items-center gap-2 ml-auto min-w-0">
 								{!isMessages && (
 									<Link
 										href="/messages"
-										className="inline-flex items-center gap-2 rounded-full px-4 py-2 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)]"
+										className="inline-flex items-center justify-center gap-2 rounded-full px-4 min-h-11 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)]"
 										aria-label="Go to messages"
 									>
 										<svg
@@ -86,7 +97,8 @@ export function NavBar() {
 											strokeWidth="2"
 											strokeLinecap="round"
 											strokeLinejoin="round"
-											className="inline-block"
+											className="shrink-0"
+											aria-hidden
 										>
 											<path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
 										</svg>
@@ -94,58 +106,130 @@ export function NavBar() {
 									</Link>
 								)}
 								{aim ? (
-									<span className="ml-1 inline-flex items-center rounded-full px-2 py-1 border border-[var(--divider)] text-xs text-[var(--text-secondary)]">
+									<span className="inline-flex items-center rounded-full px-2.5 py-1.5 min-h-11 border border-[var(--divider)] text-xs text-[var(--text-secondary)]">
 										<span className="vx-mono mr-1 text-amber">AIM</span>
 										<span className="font-semibold text-[var(--text-primary)]">
 											{formatAimScoreLabel(aim.score)}
 										</span>
 									</span>
-								) : (
-									<span className="ml-1 inline-flex items-center rounded-full px-2 py-1 border border-[var(--divider)] text-xs text-[var(--text-secondary)]">
-										<span className="vx-mono mr-1 text-amber">AIM</span>
-										<span className="font-semibold text-[var(--text-primary)]">--%</span>
+								) : null}
+								<Link
+									href="/profile"
+									className="inline-flex items-center justify-center rounded-full min-h-11 min-w-11 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)]"
+									aria-label="Go to profile"
+									title="Profile"
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										aria-hidden
+									>
+										<path d="M20 21a8 8 0 0 0-16 0" />
+										<circle cx="12" cy="7" r="4" />
+									</svg>
+								</Link>
+								<button
+									type="button"
+									onClick={handleSignOut}
+									className="rounded-full px-4 min-h-11 text-sm font-semibold border border-[var(--divider)] text-[var(--text-secondary)] hover:bg-white/5"
+									aria-label="Sign out"
+								>
+									Sign out
+								</button>
+							</div>
+
+							{/* Mobile: AIM + profile + menu */}
+							<div className="flex md:hidden items-center gap-1.5 ml-auto shrink-0">
+								{aim ? (
+									<span className="inline-flex items-center rounded-full px-2 py-1 min-h-11 border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)] max-w-[88px] sm:max-w-none truncate">
+										<span className="vx-mono mr-0.5 text-amber shrink-0">AIM</span>
+										<span className="font-semibold text-[var(--text-primary)] truncate">
+											{formatAimScoreLabel(aim.score)}
+										</span>
 									</span>
-								)}
-								<div className="flex items-center gap-1">
-									<Link
-										href="/profile"
-										className="inline-flex items-center justify-center rounded-full w-10 h-10 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)] px-0 py-0"
-										aria-label="Go to profile"
-										title="Profile"
+								) : null}
+								<Link
+									href="/profile"
+									className="inline-flex items-center justify-center rounded-full min-h-11 min-w-11 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)]"
+									aria-label="Profile"
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										aria-hidden
 									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="18"
-											height="18"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											className="inline-block"
-										>
-											<path d="M20 21a8 8 0 0 0-16 0" />
-											<circle cx="12" cy="7" r="4" />
+										<path d="M20 21a8 8 0 0 0-16 0" />
+										<circle cx="12" cy="7" r="4" />
+									</svg>
+								</Link>
+								<button
+									type="button"
+									onClick={() => setMenuOpen((o) => !o)}
+									className="inline-flex items-center justify-center rounded-lg min-h-11 min-w-11 border border-[var(--divider)] text-[var(--text-primary)]"
+									aria-label={menuOpen ? "Close menu" : "Open menu"}
+									aria-expanded={menuOpen}
+								>
+									{menuOpen ? (
+										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+											<path d="M6 6l12 12M18 6L6 18" />
 										</svg>
-									</Link>
-									<button
-										type="button"
-										onClick={() => {
-											clearAuth();
-											router.replace("/login");
-											router.refresh();
-										}}
-										className="rounded-full px-3 py-1.5 text-xs font-semibold border border-[var(--divider)] text-[var(--text-secondary)] hover:bg-white/5"
-										aria-label="Sign out"
-									>
-										Out
-									</button>
-								</div>
-							</>
-						) : null}
-					</div>
+									) : (
+										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+											<path d="M4 7h16M4 12h16M4 17h16" />
+										</svg>
+									)}
+								</button>
+							</div>
+						</>
+					)}
 				</div>
+
+				{showActions && menuOpen && (
+					<nav
+						className="md:hidden border-t border-[var(--divider)] py-3 flex flex-col gap-1"
+						aria-label="Mobile navigation"
+					>
+						{!isMessages && (
+							<Link
+								href="/messages"
+								className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover:bg-white/5"
+							>
+								Messages
+							</Link>
+						)}
+						<Link
+							href="/home"
+							className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover:bg-white/5"
+						>
+							Home
+						</Link>
+						<Link
+							href="/profile"
+							className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover:bg-white/5"
+						>
+							Profile
+						</Link>
+						<button
+							type="button"
+							onClick={handleSignOut}
+							className="flex w-full items-center rounded-lg px-3 min-h-11 text-sm font-medium text-left text-[var(--text-secondary)] hover:bg-white/5"
+						>
+							Sign out
+						</button>
+					</nav>
+				)}
 			</div>
 		</header>
 	);

@@ -157,10 +157,10 @@ export default function HomePage() {
 
   return (
     <main
-      className="min-h-screen px-4 py-6"
+      className="min-h-screen w-full min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
       style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
     >
-      <div className="mx-auto w-full max-w-vx-content">
+      <div className="mx-auto w-full max-w-vx-content min-w-0">
         <div className="mb-6 flex items-center justify-between">
           <div className="vx-eyebrow-with-line">
             <span className="vx-eyebrow">Veraxius</span>
@@ -168,7 +168,7 @@ export default function HomePage() {
           <div />
         </div>
 
-        <section className="mb-8 rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4">
+        <section className="mb-8 w-full rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div
               className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold"
@@ -183,7 +183,7 @@ export default function HomePage() {
                 onChange={(e) => setCompose(e.target.value)}
                 placeholder="What would you like to share today?"
                 className={cn(
-                  "w-full resize-none rounded-lg border bg-transparent px-4 py-3 outline-none",
+                  "w-full resize-none rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
                   "border-[var(--divider)] focus:border-[var(--amber-border)]",
                   "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                 )}
@@ -191,7 +191,11 @@ export default function HomePage() {
               />
 
               <div className="mt-2 flex justify-end">
-                <button onClick={submitPost} className="vx-btn-primary rounded-lg px-5">
+                <button
+                  type="button"
+                  onClick={submitPost}
+                  className="vx-btn-primary rounded-lg px-5 min-h-11 text-sm font-semibold sm:text-base"
+                >
                   POST
                 </button>
               </div>
@@ -215,14 +219,18 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-black/30" />
 
           <div
-            className="absolute right-4 top-16 w-[min(100%,380px)] h-[70vh] rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] shadow-xl overflow-hidden"
+            className="absolute inset-x-4 top-16 sm:inset-x-auto sm:right-4 sm:left-auto w-[calc(100%-2rem)] sm:w-full sm:max-w-md h-[min(70vh,32rem)] rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {!activeConversationId ? (
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b border-[var(--divider)] flex items-center justify-between">
                   <div className="vx-mono text-sm">Messages</div>
-                  <button onClick={() => setOpenMessages(false)} className="text-secondary text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMessages(false)}
+                    className="min-h-11 px-3 text-secondary text-sm"
+                  >
                     Close
                   </button>
                 </div>
@@ -234,7 +242,11 @@ export default function HomePage() {
             ) : (
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b border-[var(--divider)] flex items-center gap-2">
-                  <button className="text-sm" onClick={() => setActiveConversationId(null)}>
+                  <button
+                    type="button"
+                    className="min-h-11 px-3 text-sm"
+                    onClick={() => setActiveConversationId(null)}
+                  >
                     ← Back
                   </button>
                 </div>
@@ -324,7 +336,7 @@ function PostCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4">
+    <div className="w-full min-w-0 rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <Link href={`/profile/${post.userId}`} className="shrink-0" title={post.userName}>
           <div
@@ -336,8 +348,8 @@ function PostCard({
         </Link>
 
         <div className="flex-1">
-          <div className="flex items-center gap-2 text-sm">
-            <Link href={`/profile/${post.userId}`} className="font-semibold hover:underline">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+            <Link href={`/profile/${post.userId}`} className="font-semibold hover:underline truncate max-w-full">
               {post.userName}
             </Link>
 
@@ -354,10 +366,10 @@ function PostCard({
             {post.content}
           </div>
 
-          <div className="mt-3 flex items-center gap-3 text-sm">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
-              className="px-2 py-1 rounded border border-[var(--divider)] text-secondary hover:bg-white/5"
+              className="min-h-11 px-3 py-2 rounded border border-[var(--divider)] text-secondary hover:bg-white/5"
               onClick={() => setShowComments((v) => !v)}
             >
               {comments.length > 0 ? "Answers" : "Reply"} {comments.length}
@@ -366,7 +378,7 @@ function PostCard({
             <button
               type="button"
               className={cn(
-                "px-2 py-1 rounded border",
+                "min-h-11 px-3 py-2 rounded border text-sm",
                 reactedReliable
                   ? "bg-[var(--amber)] text-[var(--bg-primary)] border-[var(--amber)]"
                   : "border-[var(--divider)] text-secondary hover:bg-white/5"
@@ -379,7 +391,7 @@ function PostCard({
             <button
               type="button"
               className={cn(
-                "px-2 py-1 rounded border",
+                "min-h-11 px-3 py-2 rounded border text-sm",
                 reactedNotReliable
                   ? "bg-[var(--red)] text-[var(--bg-primary)] border-[var(--red)]"
                   : "border-[var(--divider)] text-secondary hover:bg-white/5"
@@ -426,7 +438,7 @@ function PostCard({
                   }}
                   placeholder="Write a reply…"
                   className={cn(
-                    "flex-1 rounded-lg border bg-transparent px-3 py-2 outline-none",
+                    "flex-1 min-w-0 rounded-lg border bg-transparent px-3 py-2.5 min-h-11 text-base sm:text-sm outline-none",
                     "border-[var(--divider)] focus:border-[var(--amber-border)]",
                     "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                   )}
@@ -435,7 +447,7 @@ function PostCard({
                 <button
                   type="button"
                   onClick={handleCommentSubmit}
-                  className="vx-btn-primary rounded-lg px-4"
+                  className="vx-btn-primary rounded-lg px-4 min-h-11 shrink-0 text-sm font-semibold"
                 >
                   Reply
                 </button>

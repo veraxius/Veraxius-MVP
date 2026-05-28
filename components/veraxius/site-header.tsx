@@ -16,23 +16,23 @@ export function SiteHeader() {
         WebkitBackdropFilter: "blur(16px)",
       }}
     >
-      <div className="vx-container flex items-center justify-between py-4">
+      <div className="vx-container flex items-center justify-between gap-3 py-3 sm:py-4 min-w-0">
         {/* Logo */}
-        <a href="#" aria-label="Veraxius home" className="flex items-center">
+        <a href="#" aria-label="Veraxius home" className="flex items-center shrink-0 min-h-11">
           <Image
             src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
             alt="Veraxius"
             width={180}
             height={36}
             priority
-            style={{ height: "36px", width: "auto" }}
+            className="h-7 w-auto sm:h-9 max-w-[min(100%,140px)] sm:max-w-[180px]"
           />
         </a>
 
         {/* CTA Button */}
         <a
           href="#early-access"
-          className="font-dm-mono font-medium text-[11px] tracking-cta uppercase bg-[var(--amber)] text-[var(--bg-primary)] px-5 py-3 transition-colors hover:bg-[var(--amber-glow)]"
+          className="font-dm-mono font-medium text-[10px] sm:text-[11px] tracking-cta uppercase bg-[var(--amber)] text-[var(--bg-primary)] px-3 sm:px-5 py-2.5 sm:py-3 min-h-11 inline-flex items-center shrink-0 transition-colors hover:bg-[var(--amber-glow)]"
           style={{ letterSpacing: "0.08em" }}
         >
           Request Early Access

@@ -61,8 +61,8 @@ export default function ProfilePage() {
 	}, [userId]);
 
 	return (
-		<div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-			<h1 className="text-2xl font-semibold">Adaptive Integrity System</h1>
+		<div className="w-full max-w-6xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6 sm:space-y-8">
+			<h1 className="text-xl sm:text-2xl font-semibold">Adaptive Integrity System</h1>
 
 			<AIMScoreHeroCard userId={userId} />
 
@@ -81,9 +81,9 @@ export default function ProfilePage() {
 			)}
 			{error && <div className="text-red-600">Error: {error}</div>}
 
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-				<div>
-					<h2 className="text-xl font-semibold mb-2">What&apos;s affecting your score</h2>
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 min-w-0">
+				<div className="min-w-0">
+					<h2 className="text-lg sm:text-xl font-semibold mb-2">What&apos;s affecting your score</h2>
 					<div className="border border-vx-divider rounded-xl bg-vx-panel overflow-hidden divide-y divide-vx-divider">
 						{activity.length === 0 && !loading && (
 							<div className="p-5 text-sm text-vx-text-secondary">
@@ -98,15 +98,15 @@ export default function ProfilePage() {
 					</div>
 				</div>
 
-				<div>
-					<h2 className="text-xl font-semibold mb-2">Score History</h2>
+				<div className="min-w-0">
+					<h2 className="text-lg sm:text-xl font-semibold mb-2">Score History</h2>
 					<div className="border border-vx-divider rounded-xl bg-vx-panel overflow-hidden divide-y divide-vx-divider">
 						{history.length === 0 && !loading && (
 							<div className="p-5 text-sm text-vx-text-secondary">No history</div>
 						)}
 
 						{history.map((h) => (
-							<div key={h.id} className="px-5 py-3 flex items-center justify-between gap-4">
+							<div key={h.id} className="px-4 sm:px-5 py-3 flex items-center justify-between gap-4 min-w-0">
 								<div className="space-y-0.5">
 									<div className="text-xs text-vx-text-tertiary">{h.context || "score update"}</div>
 									<div className="text-xs text-vx-text-tertiary">
@@ -143,7 +143,7 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 	const sourceLabel = item.source === "domain" ? "Domain" : "Global";
 
 	return (
-		<div className="px-5 py-3.5 flex items-start justify-between gap-4">
+		<div className="px-4 sm:px-5 py-3.5 flex items-start justify-between gap-4 min-w-0">
 			<div className="flex-1 min-w-0 space-y-1">
 				<div className="flex items-center gap-2 flex-wrap">
 					<span className="text-sm font-medium text-vx-text">{item.label}</span>

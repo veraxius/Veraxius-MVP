@@ -48,7 +48,7 @@ export function WhyThisWinsSection() {
       style={{ backgroundColor: "var(--bg-primary)" }}
     >
       <div className="vx-container">
-        <div className="max-w-[680px]">
+        <div className="w-full max-w-2xl">
 
           {/* Eyebrow */}
           <motion.div

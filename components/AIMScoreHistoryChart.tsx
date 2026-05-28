@@ -5,91 +5,141 @@ import { formatAimScoreLabel, normalizeAimFraction } from "@/lib/aimDisplay";
 import { useAIMScore } from "@/lib/hooks/useAIMScore";
 import { cn } from "@/lib/utils";
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
 const CHART_HEIGHT = 160;
 const PAD = { top: 16, right: 16, bottom: 28, left: 44 };
 
 type ChartPoint = { score: number; t: number };
 
-function buildSeries(
-	history: { score: number; created_at: string }[],
-	currentScore: number,
-): ChartPoint[] {
-	const now = Date.now();
-	const windowStart = now - 30 * MS_PER_DAY;
-	const current = normalizeAimFraction(currentScore);
+type HistoryInput = { score: number; createdAt: string };
 
-	const raw = history
-		.map((h) => ({
-			score: normalizeAimFraction(h.score),
-			t: new Date(h.created_at).getTime(),
-		}))
-		.filter((p) => p.t >= windowStart && p.t <= now)
-		.sort((a, b) => a.t - b.t);
+type WindowKind = "24h" | "7d" | "30d";
 
-	let points: ChartPoint[] = raw.length > 0 ? [...raw] : [];
+type ChartSeries = {
+	points: ChartPoint[];
+	tMin: number;
+	tMax: number;
+	windowKind: WindowKind;
+	xAxisStartLabel: string;
+};
 
-	if (points.length === 0) {
-		return [
-			{ score: current, t: windowStart },
-			{ score: current, t: now },
-		];
+function windowKindFromSpan(spanMs: number): { kind: WindowKind; windowMs: number; label: string } {
+	if (spanMs <= MS_PER_DAY) {
+		return { kind: "24h", windowMs: MS_PER_DAY, label: "24h ago" };
 	}
-
-	if (points[0].t > windowStart) {
-		points.unshift({ score: points[0].score, t: windowStart });
+	if (spanMs <= 7 * MS_PER_DAY) {
+		return { kind: "7d", windowMs: 7 * MS_PER_DAY, label: "7 days ago" };
 	}
-
-	const last = points[points.length - 1];
-	if (now - last.t > 60_000 || Math.abs(last.score - current) > 0.0001) {
-		points.push({ score: current, t: now });
-	} else {
-		points = [...points.slice(0, -1), { score: current, t: now }];
-	}
-
-	return points;
+	return { kind: "30d", windowMs: 30 * MS_PER_DAY, label: "30 days ago" };
 }
 
-function AIMLiveChart({ points }: { points: ChartPoint[] }) {
+/**
+ * Maps aimScoreHistory rows to chart points (one row = one point).
+ * Expects `createdAt` (ISO string). No deduplication.
+ */
+function buildSeries(history: HistoryInput[], currentScore: number): ChartSeries {
+	const now = Date.now();
+	const current = normalizeAimFraction(currentScore);
+
+	const historyPoints: ChartPoint[] = history
+		.map((h) => {
+			const t = new Date(h.createdAt).getTime();
+			if (!Number.isFinite(t)) return null;
+			return { score: normalizeAimFraction(h.score), t };
+		})
+		.filter((p): p is ChartPoint => p != null)
+		.sort((a, b) => a.t - b.t);
+
+	const points = [...historyPoints, { score: current, t: now }];
+
+	if (historyPoints.length === 0) {
+		const { kind, windowMs, label } = windowKindFromSpan(0);
+		return {
+			points,
+			tMin: now - windowMs,
+			tMax: now,
+			windowKind: kind,
+			xAxisStartLabel: label,
+		};
+	}
+
+	const earliest = historyPoints[0].t;
+	const latest = historyPoints[historyPoints.length - 1].t;
+	const dataSpan = Math.max(latest - earliest, 1);
+	const padding = dataSpan * 0.05;
+
+	const { kind, windowMs, label } = windowKindFromSpan(dataSpan);
+
+	const tMax = now;
+	const stale = now - latest > windowMs;
+	const tMin = stale ? earliest - padding : Math.max(earliest - padding, tMax - windowMs);
+	const tMaxAxis = stale ? latest + padding : tMax;
+
+	return {
+		points,
+		tMin,
+		tMax: tMaxAxis,
+		windowKind: kind,
+		xAxisStartLabel: label,
+	};
+}
+
+function trajectoryTitle(kind: WindowKind): string {
+	switch (kind) {
+		case "24h":
+			return "AIM trajectory — 24 hours";
+		case "7d":
+			return "AIM trajectory — 7 days";
+		default:
+			return "AIM trajectory — 30 days";
+	}
+}
+
+function AIMLiveChart({ series }: { series: ChartSeries }) {
+	const { points, tMin, tMax, xAxisStartLabel } = series;
+
 	const layout = useMemo(() => {
 		const width = 800;
 		const innerW = width - PAD.left - PAD.right;
 		const innerH = CHART_HEIGHT - PAD.top - PAD.bottom;
 
-		const scores = points.map((p) => p.score);
-		const minScore = Math.min(...scores, 0);
-		const maxScore = Math.max(...scores, 1);
-		const padY = (maxScore - minScore) * 0.08 || 0.05;
-		const yMin = Math.max(0, minScore - padY);
-		const yMax = Math.min(1, maxScore + padY);
-		const yRange = yMax - yMin || 0.01;
+		const yMin = 0;
+		const yMax = 1;
+		const yRange = yMax - yMin;
 
-		const tMin = points[0].t;
-		const tMax = points[points.length - 1].t;
 		const tRange = tMax - tMin || 1;
 
 		const coords = points.map((p) => {
-			const x = PAD.left + ((p.t - tMin) / tRange) * innerW;
+			const xT = Math.min(Math.max(p.t, tMin), tMax);
+			const x = PAD.left + ((xT - tMin) / tRange) * innerW;
 			const y = PAD.top + innerH - ((p.score - yMin) / yRange) * innerH;
 			return { x, y, score: p.score, t: p.t };
 		});
 
 		const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x} ${c.y}`).join(" ");
-		const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${PAD.top + innerH} L ${coords[0].x} ${PAD.top + innerH} Z`;
+		const areaPath =
+			coords.length >= 2
+				? `${linePath} L ${coords[coords.length - 1].x} ${PAD.top + innerH} L ${coords[0].x} ${PAD.top + innerH} Z`
+				: "";
 
-		const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+		const yTicks = [0, 0.5, 1];
 		const last = coords[coords.length - 1];
 
 		return { width, innerH, coords, linePath, areaPath, yTicks, yMin, yMax, last };
-	}, [points]);
+	}, [points, tMin, tMax]);
+
+	if (points.length === 0) {
+		return null;
+	}
 
 	return (
 		<svg
-			className="w-full h-auto select-none"
+			className="w-full h-auto max-h-48 sm:max-h-none select-none"
 			viewBox={`0 0 ${layout.width} ${CHART_HEIGHT}`}
-			preserveAspectRatio="none"
+			preserveAspectRatio="xMidYMid meet"
 			role="img"
-			aria-label="AIM score over the last 30 days"
+			aria-label="AIM score trajectory"
 		>
 			<defs>
 				<linearGradient id="aim-area-fill" x1="0" y1="0" x2="0" y2="1">
@@ -126,15 +176,19 @@ function AIMLiveChart({ points }: { points: ChartPoint[] }) {
 				);
 			})}
 
-			<path d={layout.areaPath} fill="url(#aim-area-fill)" />
-			<path
-				d={layout.linePath}
-				fill="none"
-				stroke="var(--amber)"
-				strokeWidth="2.5"
-				strokeLinejoin="round"
-				strokeLinecap="round"
-			/>
+			{layout.coords.length >= 2 && layout.linePath && (
+				<>
+					<path d={layout.areaPath} fill="url(#aim-area-fill)" />
+					<path
+						d={layout.linePath}
+						fill="none"
+						stroke="var(--amber)"
+						strokeWidth="2.5"
+						strokeLinejoin="round"
+						strokeLinecap="round"
+					/>
+				</>
+			)}
 
 			{layout.coords.slice(0, -1).map((c, i) => (
 				<circle
@@ -174,7 +228,7 @@ function AIMLiveChart({ points }: { points: ChartPoint[] }) {
 				className="fill-[var(--text-tertiary)]"
 				fontSize="10"
 			>
-				hace 30 días
+				{xAxisStartLabel}
 			</text>
 			<text
 				x={layout.width - PAD.right}
@@ -183,7 +237,7 @@ function AIMLiveChart({ points }: { points: ChartPoint[] }) {
 				className="fill-[var(--text-tertiary)]"
 				fontSize="10"
 			>
-				ahora
+				now
 			</text>
 		</svg>
 	);
@@ -202,23 +256,23 @@ export function AIMScoreHistoryChart({
 }: Props) {
 	const { summary, loading, error, refresh } = useAIMScore(userId, { pollIntervalMs });
 
-	const points = useMemo(() => {
-		if (!summary) return [];
-		return buildSeries(summary.history_30d, summary.global_score);
+	const series = useMemo(() => {
+		if (!summary) return null;
+		return buildSeries(summary.history_30d ?? [], summary.global_score);
 	}, [summary]);
 
 	const trendText = useMemo(() => {
 		if (!summary) return "";
-		if (summary.score_trend_30d === "up") return "Subiendo en 30 días";
-		if (summary.score_trend_30d === "down") return "Bajando en 30 días";
-		return "Estable en 30 días";
+		if (summary.score_trend_30d === "up") return "Up over 30 days";
+		if (summary.score_trend_30d === "down") return "Down over 30 days";
+		return "Flat over 30 days";
 	}, [summary]);
 
 	if (loading) {
 		return (
 			<div
 				className={cn(
-					"w-full rounded-2xl border border-vx-divider bg-vx-panel p-6 animate-pulse",
+					"w-full rounded-2xl border border-vx-divider bg-vx-panel p-4 sm:p-6 animate-pulse",
 					className,
 				)}
 			>
@@ -236,49 +290,52 @@ export function AIMScoreHistoryChart({
 					className,
 				)}
 			>
-				<p className="text-sm text-red-600">{error || "No se pudo cargar el historial."}</p>
+				<p className="text-sm text-red-600">{error || "Unable to load history."}</p>
 				<button
 					type="button"
 					onClick={() => void refresh()}
-					className="vx-btn-primary rounded-lg px-5 py-2 text-sm font-semibold"
+					className="vx-btn-primary rounded-lg px-5 min-h-11 text-sm font-semibold"
 				>
-					Reintentar
+					Retry
 				</button>
 			</div>
 		);
 	}
 
 	const liveScore = formatAimScoreLabel(summary.global_score);
+	const historyCount = summary.history_30d?.length ?? 0;
+	const chartTitle = series ? trajectoryTitle(series.windowKind) : "AIM trajectory — 30 days";
 
 	return (
 		<div
 			className={cn(
-				"w-full rounded-2xl border border-vx-divider bg-vx-panel p-6 md:p-8 shadow-sm",
+				"w-full min-w-0 rounded-2xl border border-vx-divider bg-vx-panel p-4 sm:p-6 md:p-8 shadow-sm",
 				className,
 			)}
 		>
-			<div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-				<div>
-					<h2 className="text-sm font-semibold text-[var(--text-primary)]">
-						Recorrido AIM — 30 días
+			<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4">
+				<div className="min-w-0">
+					<h2 className="text-sm sm:text-base font-semibold text-[var(--text-primary)]">
+						{chartTitle}
 					</h2>
 					<p className="text-xs text-[var(--text-secondary)] mt-1">
-						Movimientos reales del puntaje · actualización en vivo
+						Real score movements · live updates
+						{historyCount > 0 ? ` · ${historyCount} snapshot${historyCount === 1 ? "" : "s"}` : ""}
 					</p>
 				</div>
-				<div className="text-right">
-					<p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">Ahora</p>
-					<p className="text-lg font-bold tabular-nums text-[var(--amber)]">{liveScore}</p>
+				<div className="sm:text-right shrink-0">
+					<p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">Now</p>
+					<p className="text-base sm:text-lg font-bold tabular-nums text-[var(--amber)]">{liveScore}</p>
 					<p className="text-xs text-[var(--text-secondary)]">{trendText}</p>
 				</div>
 			</div>
 
-			<div className="rounded-xl border border-vx-divider bg-[var(--bg-primary)] px-2 pt-2 pb-1">
-				{points.length >= 2 ? (
-					<AIMLiveChart points={points} />
+			<div className="w-full min-w-0 overflow-hidden rounded-xl border border-vx-divider bg-[var(--bg-primary)] px-1 sm:px-2 pt-2 pb-1">
+				{series && series.points.length > 0 ? (
+					<AIMLiveChart series={series} />
 				) : (
 					<div className="h-[160px] flex items-center justify-center text-sm text-[var(--text-secondary)]">
-						Aún no hay suficiente historial para mostrar el recorrido.
+						Not enough history yet to show the trajectory.
 					</div>
 				)}
 			</div>

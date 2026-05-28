@@ -43,7 +43,7 @@ export function LineInSandSection() {
       style={{ backgroundColor: "var(--bg-secondary)" }}
     >
       <div className="vx-container">
-        <div className="max-w-[800px] mx-auto text-center">
+        <div className="w-full max-w-3xl mx-auto text-center">
 
           {/* Headline with animated strikethrough */}
           <motion.div

@@ -43,10 +43,10 @@ export default function RegisterPage() {
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center px-6"
+      className="min-h-screen w-full min-w-0 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
       style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
     >
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md min-w-0">
         <div className="flex items-center justify-center mb-6">
           <Image
             src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
@@ -54,10 +54,10 @@ export default function RegisterPage() {
             width={220}
             height={44}
             priority
-            className="h-11 w-auto"
+            className="h-8 w-auto sm:h-10 md:h-11 max-w-[min(100%,220px)]"
           />
         </div>
-        <div className="rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-8 shadow-xl">
+        <div className="rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-5 sm:p-8 shadow-xl">
           <div className="mb-8 text-center">
             <h1 className="vx-h3">Create account</h1>
             <p className="vx-body-sm mt-2 text-center">Sign up to get started</p>
@@ -72,7 +72,7 @@ export default function RegisterPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className={cn(
-                  "w-full rounded-lg border bg-transparent px-4 py-3 outline-none",
+                  "w-full rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
                   "border-[var(--divider)] focus:border-[var(--amber-border)]",
                   "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                 )}
@@ -87,7 +87,7 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={cn(
-                  "w-full rounded-lg border bg-transparent px-4 py-3 outline-none",
+                  "w-full rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
                   "border-[var(--divider)] focus:border-[var(--amber-border)]",
                   "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                 )}
@@ -102,7 +102,7 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={cn(
-                  "w-full rounded-lg border bg-transparent px-4 py-3 outline-none",
+                  "w-full rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
                   "border-[var(--divider)] focus:border-[var(--amber-border)]",
                   "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                 )}
@@ -113,7 +113,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               className={cn(
-                "vx-btn-primary w-full rounded-lg text-sm font-semibold",
+                "vx-btn-primary w-full rounded-lg min-h-11 text-sm font-semibold",
                 loading && "opacity-70"
               )}
               disabled={loading}

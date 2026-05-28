@@ -119,7 +119,7 @@ export function NumbersSection() {
                 delay: 0.1 * index,
                 ease: [0.25, 0.1, 0.25, 1],
               }}
-              className={`vx-panel p-12 relative group cursor-default md:col-span-2 min-h-[420px] ${
+              className={`vx-panel p-6 sm:p-12 relative group cursor-default md:col-span-2 min-h-[280px] sm:min-h-[360px] md:min-h-[420px] ${
                 index === 3 ? "md:col-start-2" : ""
               } ${index === 4 ? "md:col-start-4" : ""}`}
               style={{
