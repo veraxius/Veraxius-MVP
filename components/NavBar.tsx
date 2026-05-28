@@ -12,12 +12,6 @@ export function NavBar() {
 	const [aim, setAim] = useState<{ score: number; status: string } | null>(null);
 	const [menuOpen, setMenuOpen] = useState(false);
 
-	if (pathname === "/login" || pathname === "/register") return null;
-
-	const isHome = pathname === "/home" || pathname === "/";
-	const isMessages = pathname === "/messages";
-	const showActions = isHome || isMessages;
-
 	useEffect(() => {
 		setMenuOpen(false);
 	}, [pathname]);
@@ -52,6 +46,12 @@ export function NavBar() {
 			window.removeEventListener("vx-aim-refresh", onQuickRefresh);
 		};
 	}, [pathname]);
+
+	if (pathname === "/login" || pathname === "/register") return null;
+
+	const isHome = pathname === "/home" || pathname === "/";
+	const isMessages = pathname === "/messages";
+	const showActions = isHome || isMessages;
 
 	function handleSignOut() {
 		clearAuth();
