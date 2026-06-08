@@ -7,9 +7,14 @@ function buildContentSecurityPolicy(): string {
     "http://localhost:3001"
   ).replace(/\/$/, "");
 
+  const scriptSrc =
+    process.env.NODE_ENV === "development"
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com"
+      : "script-src 'self' 'unsafe-inline' https://accounts.google.com";
+
   return [
     "default-src 'self'",
-    "script-src 'self' https://accounts.google.com 'unsafe-inline'",
+    scriptSrc,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https:",
