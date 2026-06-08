@@ -157,18 +157,20 @@ export default function HomePage() {
 
   return (
     <main
-      className="min-h-screen w-full min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
-      style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
+      className="vx-home-surface min-h-screen w-full min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+      style={{ color: "var(--text-primary)" }}
     >
       <div className="mx-auto w-full max-w-vx-content min-w-0">
         <div className="mb-6 flex items-center justify-between">
-          <div className="vx-eyebrow-with-line">
-            <span className="vx-eyebrow">Veraxius</span>
+          <div className="vx-eyebrow-with-line vx-amber-neon-line">
+            <span className="vx-mono text-amber vx-aim-neon text-[10px] sm:text-xs uppercase">
+              Veraxius
+            </span>
           </div>
           <div />
         </div>
 
-        <section className="mb-8 w-full rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4 sm:p-5">
+        <section className="vx-feed-card mb-8 w-full rounded-2xl p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div
               className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold"
@@ -183,9 +185,10 @@ export default function HomePage() {
                 onChange={(e) => setCompose(e.target.value)}
                 placeholder="What would you like to share today?"
                 className={cn(
-                  "w-full resize-none rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
-                  "border-[var(--divider)] focus:border-[var(--amber-border)]",
-                  "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                  "w-full resize-none rounded-xl border bg-white/[0.03] px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
+                  "border-white/10 focus:border-[var(--amber-border)] focus:bg-white/[0.04]",
+                  "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
+                  "transition-colors"
                 )}
                 rows={3}
               />
@@ -194,7 +197,7 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={submitPost}
-                  className="vx-btn-primary rounded-lg px-5 min-h-11 text-sm font-semibold sm:text-base"
+                  className="vx-btn-primary vx-post-btn rounded-xl px-5 min-h-11 text-sm font-semibold sm:text-base"
                 >
                   POST
                 </button>
@@ -337,7 +340,7 @@ function PostCard({
   }
 
   return (
-    <div className="w-full min-w-0 rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-4 sm:p-5">
+    <div className="vx-feed-card w-full min-w-0 rounded-2xl p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <Link href={`/profile/${post.userId}`} className="shrink-0" title={post.userName}>
           <div
@@ -355,7 +358,7 @@ function PostCard({
             </Link>
 
             {post.userVerified && (
-              <span className="px-1.5 py-0.5 text-amber border border-amber rounded">
+              <span className="px-1.5 py-0.5 text-xs text-amber border border-amber/30 rounded-md bg-amber/5">
                 Verified
               </span>
             )}
@@ -370,7 +373,7 @@ function PostCard({
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
-              className="min-h-11 px-3 py-2 rounded border border-[var(--divider)] text-secondary hover:bg-white/5"
+              className="vx-feed-action min-h-11 px-3 py-2 rounded-lg text-secondary"
               onClick={() => setShowComments((v) => !v)}
             >
               {comments.length > 0 ? "Answers" : "Reply"} {comments.length}
@@ -381,10 +384,10 @@ function PostCard({
                 <button
                   type="button"
                   className={cn(
-                    "min-h-11 px-3 py-2 rounded border text-sm",
+                    "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
                     reactedReliable
-                      ? "bg-[var(--amber)] text-[var(--bg-primary)] border-[var(--amber)]"
-                      : "border-[var(--divider)] text-secondary hover:bg-white/5"
+                      ? "bg-[var(--amber)] text-[var(--bg-primary)] border border-[var(--amber)]"
+                      : "vx-feed-action text-secondary"
                   )}
                   onClick={() => onReact(post.id, "confiable")}
                 >
@@ -394,10 +397,10 @@ function PostCard({
                 <button
                   type="button"
                   className={cn(
-                    "min-h-11 px-3 py-2 rounded border text-sm",
+                    "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
                     reactedNotReliable
-                      ? "bg-[var(--red)] text-[var(--bg-primary)] border-[var(--red)]"
-                      : "border-[var(--divider)] text-secondary hover:bg-white/5"
+                      ? "bg-[var(--red)] text-[var(--bg-primary)] border border-[var(--red)]"
+                      : "vx-feed-action text-secondary"
                   )}
                   onClick={() => onReact(post.id, "not_reliable")}
                 >
@@ -443,16 +446,17 @@ function PostCard({
                   }}
                   placeholder="Write a reply…"
                   className={cn(
-                    "flex-1 min-w-0 rounded-lg border bg-transparent px-3 py-2.5 min-h-11 text-base sm:text-sm outline-none",
-                    "border-[var(--divider)] focus:border-[var(--amber-border)]",
-                    "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                    "flex-1 min-w-0 rounded-xl border bg-white/[0.03] px-3 py-2.5 min-h-11 text-base sm:text-sm outline-none",
+                    "border-white/10 focus:border-[var(--amber-border)] focus:bg-white/[0.04]",
+                    "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
+                    "transition-colors"
                   )}
                 />
 
                 <button
                   type="button"
                   onClick={handleCommentSubmit}
-                  className="vx-btn-primary rounded-lg px-4 min-h-11 shrink-0 text-sm font-semibold"
+                  className="vx-btn-primary rounded-xl px-4 min-h-11 shrink-0 text-sm font-semibold"
                 >
                   Reply
                 </button>

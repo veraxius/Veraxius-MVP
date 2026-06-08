@@ -53,6 +53,9 @@ export function NavBar() {
 	const isMessages = pathname === "/messages";
 	const showActions = isHome || isMessages;
 
+	const navIconBtn =
+		"inline-flex items-center justify-center rounded-full px-4 min-h-11 text-sm font-semibold bg-[var(--amber)] text-[var(--bg-primary)] hover:bg-[var(--amber-glow)] transition-colors";
+
 	function handleSignOut() {
 		clearAuth();
 		router.replace("/login");
@@ -65,8 +68,8 @@ export function NavBar() {
 			style={{ backgroundColor: "var(--bg-panel)", borderBottom: "0.1px solid var(--amber)" }}
 		>
 			<div className="w-full max-w-[100vw] px-4 sm:px-6 lg:px-8">
-				<div className="h-14 sm:h-16 flex items-center gap-2 min-w-0">
-					<Link href="/home" aria-label="Veraxius Home" className="inline-flex items-center shrink-0 min-h-11">
+				<div className="relative h-14 sm:h-16 flex items-center gap-2 min-w-0">
+					<Link href="/home" aria-label="Veraxius Home" className="inline-flex items-center shrink-0 min-h-11 z-10">
 						<Image
 							src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
 							alt="Veraxius"
@@ -77,15 +80,27 @@ export function NavBar() {
 						/>
 					</Link>
 
+					{showActions && aim ? (
+						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+							<span className="inline-flex items-center rounded-full px-2.5 py-1.5 min-h-9 sm:min-h-11 border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)] whitespace-nowrap">
+								<span className="vx-mono text-amber vx-aim-neon mr-1">AIM</span>
+								<span className="font-semibold text-[var(--text-primary)]">
+									{formatAimScoreLabel(aim.score)}
+								</span>
+							</span>
+						</div>
+					) : null}
+
 					{showActions && (
 						<>
 							{/* Desktop / tablet actions */}
-							<div className="hidden md:flex items-center gap-2 ml-auto min-w-0">
+							<div className="hidden md:flex items-center gap-2 ml-auto min-w-0 z-10">
 								{!isMessages && (
 									<Link
 										href="/messages"
-										className="inline-flex items-center justify-center gap-2 rounded-full px-4 min-h-11 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)]"
+										className={navIconBtn}
 										aria-label="Go to messages"
+										title="Messages"
 									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
@@ -97,25 +112,15 @@ export function NavBar() {
 											strokeWidth="2"
 											strokeLinecap="round"
 											strokeLinejoin="round"
-											className="shrink-0"
 											aria-hidden
 										>
 											<path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
 										</svg>
-										<span className="text-sm font-semibold">Messages</span>
 									</Link>
 								)}
-								{aim ? (
-									<span className="inline-flex items-center rounded-full px-2.5 py-1.5 min-h-11 border border-[var(--divider)] text-xs text-[var(--text-secondary)]">
-										<span className="vx-mono mr-1 text-amber">AIM</span>
-										<span className="font-semibold text-[var(--text-primary)]">
-											{formatAimScoreLabel(aim.score)}
-										</span>
-									</span>
-								) : null}
 								<Link
 									href="/profile"
-									className="inline-flex items-center justify-center rounded-full min-h-11 min-w-11 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)]"
+									className={navIconBtn}
 									aria-label="Go to profile"
 									title="Profile"
 								>
@@ -145,19 +150,32 @@ export function NavBar() {
 								</button>
 							</div>
 
-							{/* Mobile: AIM + profile + menu */}
-							<div className="flex md:hidden items-center gap-1.5 ml-auto shrink-0">
-								{aim ? (
-									<span className="inline-flex items-center rounded-full px-2 py-1 min-h-11 border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)] max-w-[88px] sm:max-w-none truncate">
-										<span className="vx-mono mr-0.5 text-amber shrink-0">AIM</span>
-										<span className="font-semibold text-[var(--text-primary)] truncate">
-											{formatAimScoreLabel(aim.score)}
-										</span>
-									</span>
-								) : null}
+							{/* Mobile: messages + profile + menu */}
+							<div className="flex md:hidden items-center gap-1.5 ml-auto shrink-0 z-10">
+								{!isMessages && (
+									<Link
+										href="/messages"
+										className={navIconBtn}
+										aria-label="Go to messages"
+										title="Messages"
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="18"
+											height="18"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="2"
+											aria-hidden
+										>
+											<path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+										</svg>
+									</Link>
+								)}
 								<Link
 									href="/profile"
-									className="inline-flex items-center justify-center rounded-full min-h-11 min-w-11 vx-btn-primary !bg-[var(--amber)] !text-[var(--bg-primary)]"
+									className={navIconBtn}
 									aria-label="Profile"
 								>
 									<svg

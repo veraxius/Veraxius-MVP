@@ -36,6 +36,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   position: relative;
+  isolation: isolate;
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Enable global scroll with custom scrollbar */
@@ -44,7 +50,7 @@ html, body {
   overflow: auto;
 }
 
-/* Subtle noise texture overlay */
+/* Subtle noise texture — background only, never over UI */
 body::before {
   content: '';
   position: fixed;
@@ -53,7 +59,7 @@ body::before {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 0;
   opacity: 0.035;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
 }
@@ -92,6 +98,90 @@ body::before {
   .vx-panel {
     background-color: var(--bg-panel);
     border: 1px solid var(--divider);
+  }
+
+  /* Home feed — vintage texture on background only */
+  .vx-home-surface {
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -10%, rgba(255, 184, 77, 0.05) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(255, 107, 87, 0.03) 0%, transparent 50%),
+      var(--bg-primary);
+    isolation: isolate;
+  }
+
+  .vx-home-surface::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.055;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+
+  .vx-home-surface > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Home feed cards — clean glass panels above vintage bg */
+  .vx-feed-card {
+    background: linear-gradient(
+      165deg,
+      rgba(22, 23, 27, 0.92) 0%,
+      rgba(16, 17, 20, 0.88) 100%
+    );
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 1px 2px rgba(0, 0, 0, 0.2),
+      0 12px 40px rgba(0, 0, 0, 0.28);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .vx-feed-card:hover {
+    border-color: rgba(255, 184, 77, 0.18);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 1px 2px rgba(0, 0, 0, 0.2),
+      0 16px 48px rgba(0, 0, 0, 0.32),
+      0 0 0 1px rgba(255, 184, 77, 0.06);
+  }
+
+  .vx-feed-action {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .vx-feed-action:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Subtle amber neon — shared by navbar AIM + home brand label */
+  .vx-aim-neon {
+    letter-spacing: 0.08em;
+    text-shadow:
+      0 0 5px rgba(255, 184, 77, 0.4),
+      0 0 10px rgba(255, 184, 77, 0.2);
+  }
+
+  .vx-amber-neon-line::before {
+    background-color: var(--amber);
+    box-shadow: 0 0 3px rgba(255, 184, 77, 0.22);
+  }
+
+  .vx-post-btn {
+    transition: background-color 0.25s ease, box-shadow 0.2s ease;
+  }
+
+  .vx-post-btn:hover {
+    box-shadow:
+      0 0 5px rgba(255, 201, 120, 0.28),
+      0 0 12px rgba(255, 184, 77, 0.12);
   }
 
   /* Typography classes */

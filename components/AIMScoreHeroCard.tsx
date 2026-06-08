@@ -176,12 +176,6 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 						>
 							{riskLevelLabel(summary.risk_level)}
 						</span>
-						<span className="text-xs text-[var(--text-secondary)]">
-							Confidence {summary.confidence_score.toFixed(1)} / 100
-						</span>
-						<span className="text-xs text-[var(--text-tertiary)]">
-							Status: {summary.aim_status}
-						</span>
 					</div>
 
 					<p className="text-xs text-[var(--text-secondary)]">{trendLabel}</p>
