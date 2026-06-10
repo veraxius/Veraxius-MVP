@@ -61,7 +61,10 @@ export default function ProfilePage() {
 	}, [userId]);
 
 	return (
-		<div className="w-full max-w-6xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6 sm:space-y-8">
+		<div
+			className="min-h-screen w-full max-w-6xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6 sm:space-y-8"
+			style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
+		>
 			<h1 className="text-xl sm:text-2xl font-semibold">Adaptive Integrity System</h1>
 
 			<AIMScoreHeroCard userId={userId} />

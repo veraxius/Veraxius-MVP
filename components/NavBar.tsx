@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { clearAuth, getAuth } from "@/lib/auth";
 import { formatAimScoreLabel } from "@/lib/aimDisplay";
+import { ThemeToggle } from "@/components/ThemeToggle";
 export function NavBar() {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -54,7 +55,7 @@ export function NavBar() {
 	const showActions = isHome || isMessages;
 
 	const navIconBtn =
-		"inline-flex items-center justify-center rounded-full px-4 min-h-11 text-sm font-semibold bg-[var(--amber)] text-[var(--bg-primary)] hover:bg-[var(--amber-glow)] transition-colors";
+		"inline-flex items-center justify-center rounded-full px-4 min-h-11 text-sm font-semibold bg-[var(--amber)] text-[var(--text-on-amber)] hover:bg-[var(--amber-glow)] transition-colors";
 
 	function handleSignOut() {
 		clearAuth();
@@ -91,10 +92,12 @@ export function NavBar() {
 						</div>
 					) : null}
 
-					{showActions && (
-						<>
+					<div className="flex items-center gap-2 ml-auto min-w-0 z-10">
+						<ThemeToggle />
+						{showActions && (
+							<>
 							{/* Desktop / tablet actions */}
-							<div className="hidden md:flex items-center gap-2 ml-auto min-w-0 z-10">
+							<div className="hidden md:flex items-center gap-2 min-w-0">
 								{!isMessages && (
 									<Link
 										href="/messages"
@@ -143,7 +146,7 @@ export function NavBar() {
 								<button
 									type="button"
 									onClick={handleSignOut}
-									className="rounded-full px-4 min-h-11 text-sm font-semibold border border-[var(--divider)] text-[var(--text-secondary)] hover:bg-white/5"
+									className="rounded-full px-4 min-h-11 text-sm font-semibold border border-[var(--divider)] text-[var(--text-secondary)] hover-bg-surface"
 									aria-label="Sign out"
 								>
 									Sign out
@@ -151,7 +154,7 @@ export function NavBar() {
 							</div>
 
 							{/* Mobile: messages + profile + menu */}
-							<div className="flex md:hidden items-center gap-1.5 ml-auto shrink-0 z-10">
+							<div className="flex md:hidden items-center gap-1.5 shrink-0">
 								{!isMessages && (
 									<Link
 										href="/messages"
@@ -210,8 +213,9 @@ export function NavBar() {
 									)}
 								</button>
 							</div>
-						</>
-					)}
+							</>
+						)}
+					</div>
 				</div>
 
 				{showActions && menuOpen && (
@@ -222,27 +226,27 @@ export function NavBar() {
 						{!isMessages && (
 							<Link
 								href="/messages"
-								className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover:bg-white/5"
+								className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover-bg-surface"
 							>
 								Messages
 							</Link>
 						)}
 						<Link
 							href="/home"
-							className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover:bg-white/5"
+							className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover-bg-surface"
 						>
 							Home
 						</Link>
 						<Link
 							href="/profile"
-							className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover:bg-white/5"
+							className="flex items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-[var(--text-primary)] hover-bg-surface"
 						>
 							Profile
 						</Link>
 						<button
 							type="button"
 							onClick={handleSignOut}
-							className="flex w-full items-center rounded-lg px-3 min-h-11 text-sm font-medium text-left text-[var(--text-secondary)] hover:bg-white/5"
+							className="flex w-full items-center rounded-lg px-3 min-h-11 text-sm font-medium text-left text-[var(--text-secondary)] hover-bg-surface"
 						>
 							Sign out
 						</button>

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { saveAuth } from "@/lib/auth";
 import { API_URL } from "@/lib/api";
 
@@ -43,9 +44,12 @@ export default function RegisterPage() {
 
   return (
     <main
-      className="min-h-screen w-full min-w-0 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
+      className="relative min-h-screen w-full min-w-0 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
       style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
     >
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md min-w-0">
         <div className="flex items-center justify-center mb-6">
           <Image

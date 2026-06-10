@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Syne, DM_Sans, DM_Mono } from "next/font/google";
 import { NavBar } from "@/components/NavBar";
 import { SessionSync } from "@/components/SessionSync";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeScript } from "@/components/ThemeScript";
 
 const syne = Syne({
   subsets: ["latin"],
@@ -40,11 +42,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${syne.variable} ${dmSans.variable} ${dmMono.variable}`}>
+    <html lang="en" className={`${syne.variable} ${dmSans.variable} ${dmMono.variable}`} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className="overflow-x-hidden min-h-screen min-w-0">
-        <SessionSync />
-        <NavBar />
-        {children}
+        <ThemeProvider>
+          <SessionSync />
+          <NavBar />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

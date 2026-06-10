@@ -1,5 +1,7 @@
 'use client';
 
+// test
+
 import { useEffect, useMemo, useState } from "react";
 import { API_URL, apiFetch } from "@/lib/api";
 import { getAuth } from "@/lib/auth";
@@ -185,8 +187,8 @@ export default function HomePage() {
                 onChange={(e) => setCompose(e.target.value)}
                 placeholder="What would you like to share today?"
                 className={cn(
-                  "w-full resize-none rounded-xl border bg-white/[0.03] px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
-                  "border-white/10 focus:border-[var(--amber-border)] focus:bg-white/[0.04]",
+                  "w-full resize-none rounded-xl border bg-surface-subtle px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
+                  "border-subtle focus:border-[var(--amber-border)] focus:bg-[var(--surface-input-focus)]",
                   "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
                   "transition-colors"
                 )}
@@ -219,7 +221,7 @@ export default function HomePage() {
 
       {openMessages && (
         <div className="fixed inset-0 z-50" onClick={() => setOpenMessages(false)}>
-          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 bg-overlay-scrim" />
 
           <div
             className="absolute inset-x-4 top-16 sm:inset-x-auto sm:right-4 sm:left-auto w-[calc(100%-2rem)] sm:w-full sm:max-w-md h-[min(70vh,32rem)] rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] shadow-xl overflow-hidden"
@@ -386,7 +388,7 @@ function PostCard({
                   className={cn(
                     "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
                     reactedReliable
-                      ? "bg-[var(--amber)] text-[var(--bg-primary)] border border-[var(--amber)]"
+                      ? "bg-[var(--amber)] text-[var(--text-on-amber)] border border-[var(--amber)]"
                       : "vx-feed-action text-secondary"
                   )}
                   onClick={() => onReact(post.id, "confiable")}
@@ -399,7 +401,7 @@ function PostCard({
                   className={cn(
                     "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
                     reactedNotReliable
-                      ? "bg-[var(--red)] text-[var(--bg-primary)] border border-[var(--red)]"
+                      ? "bg-[var(--red)] text-[var(--text-on-amber)] border border-[var(--red)]"
                       : "vx-feed-action text-secondary"
                   )}
                   onClick={() => onReact(post.id, "not_reliable")}
@@ -446,8 +448,8 @@ function PostCard({
                   }}
                   placeholder="Write a reply…"
                   className={cn(
-                    "flex-1 min-w-0 rounded-xl border bg-white/[0.03] px-3 py-2.5 min-h-11 text-base sm:text-sm outline-none",
-                    "border-white/10 focus:border-[var(--amber-border)] focus:bg-white/[0.04]",
+                    "flex-1 min-w-0 rounded-xl border bg-surface-subtle px-3 py-2.5 min-h-11 text-base sm:text-sm outline-none",
+                    "border-subtle focus:border-[var(--amber-border)] focus:bg-[var(--surface-input-focus)]",
                     "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
                     "transition-colors"
                   )}

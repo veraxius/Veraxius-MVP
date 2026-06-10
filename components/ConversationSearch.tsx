@@ -74,7 +74,7 @@ export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target
 									setOpen(false);
 									setQ("");
 								}}
-								className="w-full text-left px-4 py-3 min-h-11 hover:bg-white/5 border-b border-[var(--divider)] last:border-b-0"
+								className="w-full text-left px-4 py-3 min-h-11 hover-bg-surface border-b border-[var(--divider)] last:border-b-0"
 							>
 								<p className="vx-body text-primary">{u.email}</p>
 							</button>

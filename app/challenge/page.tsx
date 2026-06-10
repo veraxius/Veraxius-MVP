@@ -218,28 +218,31 @@ export default function ChallengePage() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-8 sm:space-y-10 text-white">
+    <div
+      className="min-h-screen w-full max-w-4xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-8 sm:space-y-10"
+      style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
+    >
       <section className="border border-vx-divider rounded-xl p-4 sm:p-6 space-y-4 bg-vx-panel">
         <h1 className="text-xl sm:text-2xl font-bold">Open a Challenge</h1>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-vx-text-tertiary">
           Flag an interaction or user behaviour for review.
         </p>
 
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wide">
+            <label className="text-xs text-vx-text-tertiary uppercase tracking-wide">
               Target User ID
             </label>
             <input
               value={targetUserId}
               onChange={(e) => setTargetUserId(e.target.value)}
               placeholder="Enter target user ID"
-              className="mt-1 w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
+              className="mt-1 w-full rounded-md border border-vx-divider bg-surface-subtle px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
             />
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wide">
+            <label className="text-xs text-vx-text-tertiary uppercase tracking-wide">
               Reason
             </label>
             <textarea
@@ -247,12 +250,12 @@ export default function ChallengePage() {
               onChange={(e) => setReason(e.target.value)}
               placeholder="Describe why you are raising this challenge..."
               rows={3}
-              className="mt-1 w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
+              className="mt-1 w-full rounded-md border border-vx-divider bg-surface-subtle px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
             />
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wide">
+            <label className="text-xs text-vx-text-tertiary uppercase tracking-wide">
               Severity
             </label>
             <div className="mt-1 flex flex-wrap gap-2">
@@ -264,7 +267,7 @@ export default function ChallengePage() {
                   className={`min-h-11 px-4 py-2 rounded border text-sm font-medium ${
                     severity === s
                       ? "bg-vx-amber text-black border-vx-amber"
-                      : "text-gray-400 border-gray-600 hover:border-gray-400"
+                      : "text-vx-text-tertiary border-vx-divider hover:border-vx-amber-border"
                   }`}
                 >
                   {s === 1 ? "Low" : s === 2 ? "Medium" : "High"}
@@ -282,7 +285,7 @@ export default function ChallengePage() {
           </button>
 
           {submitMsg && (
-            <div className="rounded-md border border-vx-divider bg-black/20 px-3 py-2 text-sm text-center">
+            <div className="rounded-md border border-vx-divider bg-surface-subtle px-3 py-2 text-sm text-center">
               {submitMsg}
             </div>
           )}
@@ -291,7 +294,7 @@ export default function ChallengePage() {
 
       <section className="border border-vx-divider rounded-xl p-4 sm:p-6 space-y-4 bg-vx-panel">
         <h2 className="text-lg sm:text-xl font-bold">View Challenges</h2>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-vx-text-tertiary">
           Enter a user ID to view challenges opened by or against that user.
         </p>
 
@@ -300,7 +303,7 @@ export default function ChallengePage() {
             value={listUserId}
             onChange={(e) => setListUserId(e.target.value)}
             placeholder="Enter user ID"
-            className="flex-1 min-w-0 rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
+            className="flex-1 min-w-0 rounded-md border border-vx-divider bg-surface-subtle px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
           />
           <button
             type="button"
@@ -313,7 +316,7 @@ export default function ChallengePage() {
         </div>
 
         {listMsg && (
-          <div className="rounded-md border border-vx-divider bg-black/20 px-3 py-2 text-sm">
+          <div className="rounded-md border border-vx-divider bg-surface-subtle px-3 py-2 text-sm">
             {listMsg}
           </div>
         )}
@@ -340,7 +343,7 @@ export default function ChallengePage() {
                 </span>
               </div>
 
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-vx-text-tertiary mt-1">
                 Severity: {c.severity} · {new Date(c.createdAt).toLocaleString()}
               </div>
             </button>
@@ -354,14 +357,14 @@ export default function ChallengePage() {
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <span className="text-gray-400">ID</span>
+              <span className="text-vx-text-tertiary">ID</span>
               <span className="font-mono text-xs truncate max-w-xs">
                 {selected.id}
               </span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-400">Status</span>
+              <span className="text-vx-text-tertiary">Status</span>
               <span
                 className={`text-xs px-2 py-0.5 rounded border font-medium ${
                   STATUS_STYLES[selected.status] || STATUS_STYLES.pending
@@ -372,40 +375,40 @@ export default function ChallengePage() {
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-400">Target User</span>
+              <span className="text-vx-text-tertiary">Target User</span>
               <span className="font-mono text-xs truncate max-w-xs">
                 {selected.targetUserId}
               </span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-400">Challenger</span>
+              <span className="text-vx-text-tertiary">Challenger</span>
               <span className="font-mono text-xs truncate max-w-xs">
                 {selected.challengerId}
               </span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-400">Severity</span>
+              <span className="text-vx-text-tertiary">Severity</span>
               <span>{selected.severity}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-400">Created</span>
+              <span className="text-vx-text-tertiary">Created</span>
               <span>{new Date(selected.createdAt).toLocaleString()}</span>
             </div>
 
             <div className="pt-2">
-              <p className="text-gray-400 mb-1">Reason</p>
-              <div className="rounded-md border border-vx-divider bg-black/30 p-3">
+              <p className="text-vx-text-tertiary mb-1">Reason</p>
+              <div className="rounded-md border border-vx-divider bg-surface-subtle p-3">
                 {selected.reason}
               </div>
             </div>
 
             {selected.resolution && (
               <div className="pt-2">
-                <p className="text-gray-400 mb-1">Resolution</p>
-                <div className="rounded-md border border-vx-divider bg-black/30 p-3">
+                <p className="text-vx-text-tertiary mb-1">Resolution</p>
+                <div className="rounded-md border border-vx-divider bg-surface-subtle p-3">
                   {selected.resolution}
                 </div>
               </div>
@@ -413,7 +416,7 @@ export default function ChallengePage() {
 
             {typeof selected.impact === "number" && (
               <div className="flex justify-between gap-4">
-                <span className="text-gray-400">Impact</span>
+                <span className="text-vx-text-tertiary">Impact</span>
                 <span>{selected.impact}</span>
               </div>
             )}
@@ -429,7 +432,7 @@ export default function ChallengePage() {
                   e.target.value as "upheld" | "dismissed" | "mixed" | "malicious"
                 )
               }
-              className="w-full rounded-md border border-vx-divider bg-black/30 px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
+              className="w-full rounded-md border border-vx-divider bg-surface-subtle px-3 py-2.5 min-h-11 text-base sm:text-sm focus:outline-none focus:border-vx-amber"
             >
               <option value="upheld">upheld</option>
               <option value="dismissed">dismissed</option>
@@ -446,7 +449,7 @@ export default function ChallengePage() {
             </button>
 
             {resolveMsg && (
-              <div className="rounded-md border border-vx-divider bg-black/20 px-3 py-2 text-sm">
+              <div className="rounded-md border border-vx-divider bg-surface-subtle px-3 py-2 text-sm">
                 {resolveMsg}
               </div>
             )}

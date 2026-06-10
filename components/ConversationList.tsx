@@ -85,8 +85,8 @@ export function ConversationList({
 						key={c.id}
 						onClick={() => onSelect(c.id)}
 						className={cn(
-							"w-full text-left px-4 py-3 min-h-11 border-b border-[var(--divider)] hover:bg-white/5",
-							activeId === c.id ? "bg-white/10" : ""
+							"w-full text-left px-4 py-3 min-h-11 border-b border-[var(--divider)] hover-bg-surface",
+							activeId === c.id ? "bg-surface-active" : ""
 						)}
 					>
 						<div className="flex items-center justify-between gap-2 min-w-0">

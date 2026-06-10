@@ -145,7 +145,7 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 				<div className="flex items-center gap-2 min-w-0">
 					<div
 						className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-						style={{ backgroundColor: "var(--amber)", color: "var(--bg-primary)" }}
+						style={{ backgroundColor: "var(--amber)", color: "var(--text-on-amber)" }}
 						title={peerEmail ?? undefined}
 					>
 						{initials(peerName ?? peerEmail ?? "U")}
@@ -166,7 +166,7 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 							className={cn(
 								"inline-block max-w-[min(85%,20rem)] sm:max-w-[70%] rounded-lg px-3 py-2 break-words",
 								m.senderId === meId
-									? "bg-[var(--amber)] text-[var(--bg-primary)]"
+									? "bg-[var(--amber)] text-[var(--text-on-amber)]"
 									: "border border-[var(--divider)] text-[var(--text-primary)]"
 							)}
 						>

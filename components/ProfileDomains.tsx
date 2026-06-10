@@ -153,7 +153,7 @@ function DomainRow({
 			href={`/profile/${userId}#${anchorId}`}
 			id={anchorId}
 			scroll={false}
-			className="block h-full px-4 py-4 sm:px-5 sm:py-4 flex flex-col gap-2.5 rounded-xl border border-vx-divider bg-vx-panel transition-colors hover:bg-white/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-amber/50 min-w-0"
+			className="block h-full px-4 py-4 sm:px-5 sm:py-4 flex flex-col gap-2.5 rounded-xl border border-vx-divider bg-vx-panel transition-colors hover-bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-amber/50 min-w-0"
 		>
 			{/* Top row: icon + name | signals + trend */}
 			<div className="flex items-center justify-between gap-3">
