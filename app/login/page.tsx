@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { VeraxiusLogo } from "@/components/VeraxiusLogo";
 import { saveAuth } from "@/lib/auth";
 import { API_URL } from "@/lib/api";
 import type { GoogleCredentialResponse } from "@/types/google-identity";
@@ -162,14 +162,7 @@ export default function LoginPage() {
         </div>
         <div className="w-full max-w-md min-w-0">
           <div className="flex items-center justify-center mb-6">
-            <Image
-              src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
-              alt="Veraxius"
-              width={220}
-              height={44}
-              priority
-              className="h-8 w-auto sm:h-10 md:h-11 max-w-[min(100%,220px)]"
-            />
+            <VeraxiusLogo variant="login" priority />
           </div>
           <div className="rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-5 sm:p-8 shadow-xl">
             <div className="mb-8 text-center">

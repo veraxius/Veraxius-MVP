@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { clearAuth, getAuth } from "@/lib/auth";
 import { formatAimScoreLabel } from "@/lib/aimDisplay";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { VeraxiusLogo } from "@/components/VeraxiusLogo";
 export function NavBar() {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -69,35 +69,32 @@ export function NavBar() {
 			style={{ backgroundColor: "var(--bg-panel)", borderBottom: "0.1px solid var(--amber)" }}
 		>
 			<div className="w-full max-w-[100vw] px-4 sm:px-6 lg:px-8">
-				<div className="relative h-14 sm:h-16 flex items-center gap-2 min-w-0">
-					<Link href="/home" aria-label="Veraxius Home" className="inline-flex items-center shrink-0 min-h-11 z-10">
-						<Image
-							src="/Veraxius Logo FINAL FINAL 2 Horizontal Version-02.png"
-							alt="Veraxius"
-							width={140}
-							height={28}
-							className="h-6 w-auto sm:h-7 max-w-[120px] sm:max-w-[140px]"
-							priority
-						/>
+				<div className="grid h-14 sm:h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-2 min-w-0">
+					<Link
+						href="/home"
+						aria-label="Veraxius Home"
+						className="inline-flex items-center justify-self-start shrink-0 min-h-11 overflow-visible min-w-0"
+					>
+						<VeraxiusLogo variant="navbar" priority />
 					</Link>
 
-					{showActions && aim ? (
-						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-							<span className="inline-flex items-center rounded-full px-2.5 py-1.5 min-h-9 sm:min-h-11 border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)] whitespace-nowrap">
-								<span className="vx-mono text-amber vx-aim-neon mr-1">AIM</span>
-								<span className="font-semibold text-[var(--text-primary)]">
+					<div className="flex justify-center px-1 min-w-0">
+						{showActions && aim ? (
+							<span className="inline-flex items-center rounded-full px-2 py-1 sm:px-2.5 sm:py-1.5 min-h-8 sm:min-h-11 border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)] whitespace-nowrap max-w-full">
+								<span className="vx-mono text-amber vx-aim-neon mr-0.5 sm:mr-1 shrink-0">AIM</span>
+								<span className="font-semibold text-[var(--text-primary)] truncate">
 									{formatAimScoreLabel(aim.score)}
 								</span>
 							</span>
-						</div>
-					) : null}
+						) : null}
+					</div>
 
-					<div className="flex items-center gap-2 ml-auto min-w-0 z-10">
+					<div className="flex items-center justify-end justify-self-end gap-1 sm:gap-2 min-w-0">
 						<ThemeToggle />
 						{showActions && (
 							<>
 							{/* Desktop / tablet actions */}
-							<div className="hidden md:flex items-center gap-2 min-w-0">
+							<div className="hidden md:flex items-center gap-2 min-w-0 shrink-0">
 								{!isMessages && (
 									<Link
 										href="/messages"
@@ -154,7 +151,7 @@ export function NavBar() {
 							</div>
 
 							{/* Mobile: messages + profile + menu */}
-							<div className="flex md:hidden items-center gap-1.5 shrink-0">
+							<div className="flex md:hidden items-center gap-1 sm:gap-1.5 shrink-0">
 								{!isMessages && (
 									<Link
 										href="/messages"
