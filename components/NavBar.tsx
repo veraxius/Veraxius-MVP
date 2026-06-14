@@ -90,7 +90,7 @@ export function NavBar() {
 					</div>
 
 					<div className="flex items-center justify-end justify-self-end gap-1 sm:gap-2 min-w-0">
-						<ThemeToggle />
+						<ThemeToggle className={showActions ? "hidden md:inline-flex" : undefined} />
 						{showActions && (
 							<>
 							{/* Desktop / tablet actions */}
@@ -240,6 +240,7 @@ export function NavBar() {
 						>
 							Profile
 						</Link>
+						<ThemeToggle variant="menu" />
 						<button
 							type="button"
 							onClick={handleSignOut}

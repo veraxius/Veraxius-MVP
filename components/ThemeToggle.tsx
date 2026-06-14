@@ -42,9 +42,38 @@ function SunIcon() {
 	);
 }
 
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+	className,
+	variant = "icon",
+}: {
+	className?: string;
+	variant?: "icon" | "menu";
+}) {
 	const { theme, toggleTheme } = useTheme();
 	const isDark = theme === "dark";
+
+	if (variant === "menu") {
+		return (
+			<button
+				type="button"
+				onClick={toggleTheme}
+				className={cn(
+					"flex w-full items-center gap-3 rounded-lg px-3 min-h-11 text-sm font-medium text-left",
+					"text-[var(--text-primary)] hover-bg-surface transition-colors",
+					className,
+				)}
+				aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+			>
+				<span className="inline-flex shrink-0 text-[var(--text-secondary)]">
+					{isDark ? <MoonIcon /> : <SunIcon />}
+				</span>
+				<span>Appearance</span>
+				<span className="ml-auto text-xs text-[var(--text-tertiary)]">
+					{isDark ? "Dark" : "Light"}
+				</span>
+			</button>
+		);
+	}
 
 	return (
 		<button
