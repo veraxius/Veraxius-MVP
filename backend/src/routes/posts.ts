@@ -25,6 +25,24 @@ const CommentSchema = z.object({
   content: zContent,
 });
 
+async function enrichPostsWithAvatars<T extends { userId: string }>(posts: T[]) {
+  const userIds = [...new Set(posts.map((p) => p.userId))];
+  if (userIds.length === 0) {
+    return posts.map((p) => ({ ...p, userProfilePictureUrl: null as string | null }));
+  }
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, profilePictureUrl: true },
+  });
+  const urlByUserId = new Map(users.map((u) => [u.id, u.profilePictureUrl]));
+
+  return posts.map((p) => ({
+    ...p,
+    userProfilePictureUrl: urlByUserId.get(p.userId) ?? null,
+  }));
+}
+
 const PostIdParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
@@ -40,7 +58,7 @@ router.get("/", async (_req, res) => {
       },
     });
 
-    return res.json(posts);
+    return res.json(await enrichPostsWithAvatars(posts));
   } catch (err) {
     return internalError(res, err, "GET /api/posts");
   }
@@ -70,7 +88,10 @@ router.post("/", requireAuth, async (req, res) => {
       console.error("onPostCreated domain classification error", err);
     });
 
-    return res.json(post);
+    return res.json({
+      ...post,
+      userProfilePictureUrl: user?.profilePictureUrl ?? null,
+    });
   } catch (err) {
     return internalError(res, err, "POST /api/posts");
   }

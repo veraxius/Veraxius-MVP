@@ -10,6 +10,7 @@ import { ChatWindow } from "@/components/ChatWindow";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { notifyAimRefresh } from "@/lib/aimEvents";
+import { UserAvatar } from "@/components/UserAvatar";
 
 type ReactionType = "confiable" | "not_reliable";
 
@@ -18,6 +19,7 @@ type Post = {
   userId: string;
   userName: string;
   userVerified: boolean;
+  userProfilePictureUrl?: string | null;
   content: string;
   createdAt: string;
   reactions: { id: number; postId: number; userId: string; type: string }[];
@@ -29,6 +31,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [compose, setCompose] = useState("");
+  const [myProfilePictureUrl, setMyProfilePictureUrl] = useState<string | null>(null);
   const [openMessages, setOpenMessages] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
@@ -48,30 +51,46 @@ export default function HomePage() {
 
   useEffect(() => {
     loadPosts();
+    function onAvatarUpdated() {
+      void loadPosts();
+    }
+    window.addEventListener("vx-avatar-updated", onAvatarUpdated);
+    return () => window.removeEventListener("vx-avatar-updated", onAvatarUpdated);
+  }, []);
+
+  useEffect(() => {
+    const auth = getAuth();
+    const userId = auth?.user?.id;
+    if (!userId) return;
+
+    async function loadMyAvatar() {
+      try {
+        const resp = await fetch(`/api/users/${userId}/aim-summary`, { cache: "no-store" });
+        const data = await resp.json();
+        if (resp.ok) {
+          setMyProfilePictureUrl(data?.user?.profilePictureUrl ?? null);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    void loadMyAvatar();
+
+    function onAvatarUpdated(e: Event) {
+      const detail = (e as CustomEvent<{ profilePictureUrl?: string }>).detail;
+      if (detail?.profilePictureUrl) {
+        setMyProfilePictureUrl(detail.profilePictureUrl);
+      } else {
+        void loadMyAvatar();
+      }
+    }
+
+    window.addEventListener("vx-avatar-updated", onAvatarUpdated);
+    return () => window.removeEventListener("vx-avatar-updated", onAvatarUpdated);
   }, []);
 
   const me = useMemo(() => getAuth()?.user ?? null, []);
-
-  function initials(name: string) {
-    const parts = name.split(/\s+/).filter(Boolean);
-    const first = parts[0]?.[0] ?? "";
-    const second = parts[1]?.[0] ?? "";
-    return (first + second).toUpperCase() || name.slice(0, 2).toUpperCase();
-  }
-
-  function nameColor(name: string) {
-    const hues = [18, 32, 140, 200, 260];
-    const h = hues[Math.abs(hashCode(name)) % hues.length];
-    return `hsl(${h} 60% 35%)`;
-  }
-
-  function hashCode(s: string) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) {
-      h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-    }
-    return h;
-  }
 
   async function submitPost() {
     const text = compose.trim();
@@ -174,12 +193,15 @@ export default function HomePage() {
 
         <section className="vx-feed-card mb-8 w-full rounded-2xl p-4 sm:p-5">
           <div className="flex items-start gap-3">
-            <div
-              className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold"
-              style={{ backgroundColor: nameColor(me?.email?.split("@")[0] || "me"), color: "#fff" }}
-            >
-              {initials(me?.email?.split("@")[0] || "ME")}
-            </div>
+            {me?.id ? (
+              <UserAvatar
+                userId={me.id}
+                name={me.name}
+                email={me.email}
+                profilePictureUrl={myProfilePictureUrl}
+                size="md"
+              />
+            ) : null}
 
             <div className="flex-1">
               <textarea
@@ -345,12 +367,12 @@ function PostCard({
     <div className="vx-feed-card w-full min-w-0 rounded-2xl p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <Link href={`/profile/${post.userId}`} className="shrink-0" title={post.userName}>
-          <div
-            className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold"
-            style={{ backgroundColor: nameColor(post.userName), color: "#fff" }}
-          >
-            {initials(post.userName)}
-          </div>
+          <UserAvatar
+            userId={post.userId}
+            name={post.userName}
+            profilePictureUrl={post.userProfilePictureUrl}
+            size="md"
+          />
         </Link>
 
         <div className="flex-1">

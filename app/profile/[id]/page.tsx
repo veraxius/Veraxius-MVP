@@ -7,6 +7,8 @@ import { getAuth } from "@/lib/auth";
 import ProfileDomains from "@/components/ProfileDomains";
 import { AIMScoreHeroCard } from "@/components/AIMScoreHeroCard";
 import { AIMScoreHistoryChart } from "@/components/AIMScoreHistoryChart";
+import { UserAvatar } from "@/components/UserAvatar";
+import { useAIMScore } from "@/lib/hooks/useAIMScore";
 import { formatAimScoreLabel } from "@/lib/aimDisplay";
 
 type AimScoreHistory = {
@@ -27,6 +29,8 @@ type ActivityItem = {
 	createdAt: string;
 };
 
+const LIST_PREVIEW_LIMIT = 10;
+
 export default function ProfilePage() {
 	const params = useParams<{ id: string }>();
 	const userId = params.id;
@@ -35,9 +39,18 @@ export default function ProfilePage() {
 	const [error, setError] = useState<string | null>(null);
 	const [history, setHistory] = useState<AimScoreHistory[]>([]);
 	const [activity, setActivity] = useState<ActivityItem[]>([]);
+	const [showAllActivity, setShowAllActivity] = useState(false);
+	const [showAllHistory, setShowAllHistory] = useState(false);
 
 	const currentAuth = typeof window !== "undefined" ? getAuth() : null;
 	const isOwnProfile = currentAuth?.user?.id === userId;
+	const { summary, refresh: refreshSummary } = useAIMScore(userId);
+
+	const registeredName =
+		summary?.user.name?.trim() ||
+		(isOwnProfile ? currentAuth?.user?.name?.trim() : "") ||
+		summary?.user.email?.split("@")[0] ||
+		"";
 
 	async function loadFeed() {
 		try {
@@ -55,19 +68,48 @@ export default function ProfilePage() {
 	}
 
 	useEffect(() => {
+		setShowAllActivity(false);
+		setShowAllHistory(false);
 		loadFeed();
 		const interval = setInterval(loadFeed, 10_000);
 		return () => clearInterval(interval);
 	}, [userId]);
+
+	const visibleActivity = showAllActivity ? activity : activity.slice(0, LIST_PREVIEW_LIMIT);
+	const visibleHistory = showAllHistory ? history : history.slice(0, LIST_PREVIEW_LIMIT);
 
 	return (
 		<div
 			className="min-h-screen w-full max-w-6xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6 sm:space-y-8"
 			style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
 		>
-			<h1 className="text-xl sm:text-2xl font-semibold">Adaptive Integrity System</h1>
+			<h1 className="text-xl sm:text-2xl font-semibold text-center">Adaptive Integrity System</h1>
 
-			<AIMScoreHeroCard userId={userId} />
+			<div className="flex flex-row items-start gap-3 sm:gap-5 min-w-0">
+				<div className="flex flex-col items-center shrink-0 w-24 sm:w-28">
+					<UserAvatar
+						userId={userId}
+						name={summary?.user.name ?? (isOwnProfile ? currentAuth?.user?.name : null)}
+						email={summary?.user.email ?? currentAuth?.user?.email}
+						profilePictureUrl={summary?.user.profilePictureUrl ?? null}
+						size="lg"
+						editable={isOwnProfile}
+						onUploaded={() => void refreshSummary()}
+						className="w-full"
+					/>
+					{registeredName ? (
+						<p
+							className="mt-2 w-full text-center text-sm sm:text-base font-semibold text-[var(--text-primary)] leading-tight break-words"
+							title={registeredName}
+						>
+							{registeredName}
+						</p>
+					) : null}
+				</div>
+				<div className="flex-1 w-full min-w-0">
+					<AIMScoreHeroCard userId={userId} compact />
+				</div>
+			</div>
 
 			<AIMScoreHistoryChart userId={userId} pollIntervalMs={10_000} />
 
@@ -95,9 +137,19 @@ export default function ProfilePage() {
 							</div>
 						)}
 
-						{activity.map((item) => (
+						{visibleActivity.map((item) => (
 							<ActivityRow key={item.id} item={item} />
 						))}
+
+						{activity.length > LIST_PREVIEW_LIMIT ? (
+							<button
+								type="button"
+								onClick={() => setShowAllActivity((v) => !v)}
+								className="w-full px-4 sm:px-5 py-3 text-sm font-medium text-amber hover-bg-surface border-t border-vx-divider transition-colors"
+							>
+								{showAllActivity ? "Show less" : "Show more+"}
+							</button>
+						) : null}
 					</div>
 				</div>
 
@@ -108,7 +160,7 @@ export default function ProfilePage() {
 							<div className="p-5 text-sm text-vx-text-secondary">No history</div>
 						)}
 
-						{history.map((h) => (
+						{visibleHistory.map((h) => (
 							<div key={h.id} className="px-4 sm:px-5 py-3 flex items-center justify-between gap-4 min-w-0">
 								<div className="space-y-0.5">
 									<div className="text-xs text-vx-text-tertiary">{h.context || "score update"}</div>
@@ -121,6 +173,16 @@ export default function ProfilePage() {
 								</div>
 							</div>
 						))}
+
+						{history.length > LIST_PREVIEW_LIMIT ? (
+							<button
+								type="button"
+								onClick={() => setShowAllHistory((v) => !v)}
+								className="w-full px-4 sm:px-5 py-3 text-sm font-medium text-amber hover-bg-surface border-t border-vx-divider transition-colors"
+							>
+								{showAllHistory ? "Show less" : "Show more+"}
+							</button>
+						) : null}
 					</div>
 
 					{/* <h2 className="text-xl font-semibold mt-6 mb-2">Challenge Layer</h2>

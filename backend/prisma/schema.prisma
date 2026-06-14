@@ -13,6 +13,7 @@ model User {
   password     String
   googleId     String?                   @unique
   name         String?
+  profilePictureUrl String?
   created_at   DateTime                  @default(now())
   lastActiveAt DateTime?
   aimConfidence Decimal?                 @db.Decimal(3, 2)

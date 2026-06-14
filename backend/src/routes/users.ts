@@ -1,4 +1,7 @@
 import { Router } from "express";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { Readable } from "stream";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
@@ -9,6 +12,66 @@ import { zUuid, invalidPayload, internalError } from "../lib/validation";
 const router = Router();
 
 const aimEngine = new AIMEngine();
+
+const ALLOWED_AVATAR_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+
+cloudinary.config({
+	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+	api_key: process.env.CLOUDINARY_API_KEY,
+	api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const avatarUpload = multer({
+	storage: multer.memoryStorage(),
+	limits: { fileSize: MAX_AVATAR_SIZE },
+	fileFilter: (_req, file, cb) => {
+		if (ALLOWED_AVATAR_MIME.has(file.mimetype)) {
+			cb(null, true);
+			return;
+		}
+		cb(new Error("Invalid file type"));
+	},
+});
+
+function uploadAvatarToCloudinary(buffer: Buffer): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const uploadStream = cloudinary.uploader.upload_stream(
+			{
+				folder: "veraxius/avatars",
+				transformation: { width: 400, height: 400, crop: "fill", gravity: "face" },
+			},
+			(error, result) => {
+				if (error) {
+					reject(error);
+					return;
+				}
+				if (!result?.secure_url) {
+					reject(new Error("Upload failed"));
+					return;
+				}
+				resolve(result.secure_url);
+			},
+		);
+
+		Readable.from(buffer).pipe(uploadStream);
+	});
+}
+
+function handleAvatarUpload(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
+	avatarUpload.single("avatar")(req, res, (err: unknown) => {
+		if (err instanceof multer.MulterError) {
+			if (err.code === "LIMIT_FILE_SIZE") {
+				return res.status(400).json({ error: "File too large" });
+			}
+			return res.status(400).json({ error: "Upload failed" });
+		}
+		if (err) {
+			return res.status(400).json({ error: "Invalid file type" });
+		}
+		return next();
+	});
+}
 
 const SearchQuerySchema = z.object({
 	q: z.string().max(100).optional(),
@@ -56,6 +119,49 @@ router.get("/search", requireAuth, async (req, res) => {
 	}
 });
 
+router.post("/:userId/avatar", requireAuth, handleAvatarUpload, async (req, res) => {
+	try {
+		const params = UserIdParamsSchema.safeParse(req.params);
+		if (!params.success) return invalidPayload(res);
+
+		const { userId } = params.data;
+		if (req.userId !== userId) {
+			return res.status(403).json({ error: "Forbidden" });
+		}
+
+		if (!req.file) {
+			return res.status(400).json({ error: "No avatar file provided" });
+		}
+
+		if (!ALLOWED_AVATAR_MIME.has(req.file.mimetype)) {
+			return res.status(400).json({ error: "Invalid file type" });
+		}
+
+		if (req.file.size > MAX_AVATAR_SIZE) {
+			return res.status(400).json({ error: "File too large" });
+		}
+
+		if (
+			!process.env.CLOUDINARY_CLOUD_NAME ||
+			!process.env.CLOUDINARY_API_KEY ||
+			!process.env.CLOUDINARY_API_SECRET
+		) {
+			return res.status(500).json({ error: "Upload service not configured" });
+		}
+
+		const profilePictureUrl = await uploadAvatarToCloudinary(req.file.buffer);
+
+		await prisma.user.update({
+			where: { id: userId },
+			data: { profilePictureUrl },
+		});
+
+		return res.json({ profilePictureUrl });
+	} catch (err) {
+		return internalError(res, err, "POST /api/users/:userId/avatar");
+	}
+});
+
 router.get("/:userId/aim-summary", async (req, res) => {
 	try {
 		const params = UserIdParamsSchema.safeParse(req.params);
@@ -68,10 +174,12 @@ router.get("/:userId/aim-summary", async (req, res) => {
 			select: {
 				id: true,
 				email: true,
+				name: true,
 				aimScore: true,
 				aimStatus: true,
 				aimConfidence: true,
 				created_at: true,
+				profilePictureUrl: true,
 			},
 		});
 		if (!user) return res.status(404).json({ error: "User not found" });
@@ -128,7 +236,9 @@ router.get("/:userId/aim-summary", async (req, res) => {
 			user: {
 				id: user.id,
 				email: user.email,
+				name: user.name,
 				created_at: user.created_at,
+				profilePictureUrl: user.profilePictureUrl,
 			},
 			global_score,
 			confidence_score,

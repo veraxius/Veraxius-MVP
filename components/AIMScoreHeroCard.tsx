@@ -15,20 +15,23 @@ import { cn } from "@/lib/utils";
 type Props = {
 	userId: string;
 	className?: string;
+	compact?: boolean;
 };
 
 function GaugeRing({
 	aimFraction,
 	colorClass,
+	compact = false,
 }: {
 	/** 0–1 global AIM (matches DB `aimScore`). */
 	aimFraction: number;
 	colorClass: string;
+	compact?: boolean;
 }) {
 	const score = normalizeAimFraction(aimFraction);
 	const fillRatio = aimGaugeFillFraction(aimFraction);
-	const size = 180;
-	const stroke = 12;
+	const size = compact ? 120 : 180;
+	const stroke = compact ? 9 : 12;
 	const radius = (size - stroke) / 2;
 	const circumference = 2 * Math.PI * radius;
 	const dashoffset = circumference * (1 - fillRatio);
@@ -37,7 +40,10 @@ function GaugeRing({
 	return (
 		<div
 			className={cn(
-				"relative aspect-square w-full max-w-[140px] sm:max-w-[160px] md:max-w-[180px] mx-auto",
+				"relative aspect-square w-full mx-auto",
+				compact
+					? "max-w-[88px] sm:max-w-[100px]"
+					: "max-w-[140px] sm:max-w-[160px] md:max-w-[180px]",
 				colorClass,
 			)}
 		>
@@ -69,16 +75,23 @@ function GaugeRing({
 				/>
 			</svg>
 			<div className="absolute inset-0 flex flex-col items-center justify-center px-2">
-				<div className="text-xl sm:text-2xl md:text-3xl font-bold tabular-nums">
+				<div
+					className={cn(
+						"font-bold tabular-nums",
+						compact ? "text-lg sm:text-xl" : "text-xl sm:text-2xl md:text-3xl",
+					)}
+				>
 					{formatAimScoreLabel(score)}
 				</div>
-				<div className="text-xs text-[var(--text-secondary)] mt-1">AIM Score</div>
+				<div className={cn("text-[var(--text-secondary)]", compact ? "text-[10px] mt-0.5" : "text-xs mt-1")}>
+					AIM Score
+				</div>
 			</div>
 		</div>
 	);
 }
 
-export function AIMScoreHeroCard({ userId, className }: Props) {
+export function AIMScoreHeroCard({ userId, className, compact = false }: Props) {
 	const { summary, loading, error, refresh } = useAIMScore(userId);
 
 	const badgeClass = summary ? riskBadgeClass(summary.risk_level) : "";
@@ -99,24 +112,34 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 		return (
 			<div
 				className={cn(
-					"w-full rounded-2xl border border-vx-divider bg-vx-panel p-4 sm:p-6 md:p-8 animate-pulse",
+					"w-full rounded-2xl border border-vx-divider bg-vx-panel animate-pulse",
+					compact ? "p-3 sm:p-4" : "p-4 sm:p-6 md:p-8",
 					className,
 				)}
 			>
-				<div className="flex flex-col md:flex-row items-center gap-8">
-					<div className="h-36 w-36 sm:h-44 sm:w-44 rounded-full bg-vx-divider shrink-0 mx-auto" />
+				<div className={cn("flex items-center", compact ? "gap-4" : "flex-col md:flex-row gap-8")}>
+					<div
+						className={cn(
+							"rounded-full bg-vx-divider shrink-0 mx-auto",
+							compact ? "h-24 w-24" : "h-36 w-36 sm:h-44 sm:w-44",
+						)}
+					/>
 					<div className="flex-1 space-y-3 w-full max-w-md">
 						<div className="h-4 w-48 rounded bg-vx-divider" />
-						<div className="h-10 w-full rounded bg-vx-divider" />
+						<div className="h-8 w-full rounded bg-vx-divider" />
 						<div className="h-4 w-32 rounded bg-vx-divider" />
 					</div>
 				</div>
-				<div className="mt-8 h-16 rounded-lg bg-vx-divider" />
-				<div className="mt-4 flex flex-wrap gap-2">
-					{[1, 2, 3].map((i) => (
-						<div key={i} className="h-8 w-24 rounded-full bg-vx-divider" />
-					))}
-				</div>
+				{!compact && (
+					<>
+						<div className="mt-8 h-16 rounded-lg bg-vx-divider" />
+						<div className="mt-4 flex flex-wrap gap-2">
+							{[1, 2, 3].map((i) => (
+								<div key={i} className="h-8 w-24 rounded-full bg-vx-divider" />
+							))}
+						</div>
+					</>
+				)}
 			</div>
 		);
 	}
@@ -144,33 +167,50 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 	return (
 		<div
 			className={cn(
-				"w-full rounded-2xl border border-vx-divider bg-vx-panel p-4 sm:p-6 md:p-8 shadow-sm",
+				"w-full rounded-2xl border border-vx-divider bg-vx-panel shadow-sm",
+				compact ? "p-3 sm:p-4" : "p-4 sm:p-6 md:p-8",
 				className,
 			)}
 		>
-			<div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
-				<div className="flex flex-col items-center shrink-0 w-full md:w-auto">
+			<div
+				className={cn(
+					"flex items-center",
+					compact ? "flex-row gap-3 sm:gap-4" : "flex-col md:flex-row md:items-start gap-6 sm:gap-8",
+				)}
+			>
+				<div className={cn("flex flex-col items-center shrink-0", compact ? "w-auto" : "w-full md:w-auto")}>
 					<GaugeRing
 						aimFraction={summary.global_score}
 						colorClass={riskGaugeColorClass(summary.risk_level)}
+						compact={compact}
 					/>
 				</div>
 
-				<div className="flex-1 w-full min-w-0 space-y-3 sm:space-y-4 text-center md:text-left">
+				<div
+					className={cn(
+						"flex-1 w-full min-w-0",
+						compact ? "space-y-1.5 sm:space-y-2 text-left" : "space-y-3 sm:space-y-4 text-center md:text-left",
+					)}
+				>
 					<div>
-						<p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
+						<p className="text-[10px] sm:text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
 							Account
 						</p>
-						<p className="font-medium text-[var(--text-primary)] break-all">
+						<p
+							className={cn(
+								"font-medium text-[var(--text-primary)] break-all",
+								compact ? "text-xs sm:text-sm" : "",
+							)}
+						>
 							{summary.user.email}
 						</p>
-						{/*<p className="text-xs text-[var(--text-tertiary)] mt-1">ID: {summary.user.id}</p>*/}
 					</div>
 
 					<div className="flex flex-wrap gap-2 items-center">
 						<span
 							className={cn(
-								"px-2.5 py-1 text-xs font-medium rounded-md border",
+								"font-medium rounded-md border",
+								compact ? "px-2 py-0.5 text-[10px] sm:text-xs" : "px-2.5 py-1 text-xs",
 								badgeClass,
 							)}
 						>
@@ -178,12 +218,19 @@ export function AIMScoreHeroCard({ userId, className }: Props) {
 						</span>
 					</div>
 
-					<p className="text-xs text-[var(--text-secondary)]">{trendLabel}</p>
+					<p className={cn("text-[var(--text-secondary)]", compact ? "text-[10px] sm:text-xs" : "text-xs")}>
+						{trendLabel}
+					</p>
 				</div>
 			</div>
 
-			<div className="mt-8">
-				<h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
+			<div className={compact ? "mt-4" : "mt-8"}>
+				<h3
+					className={cn(
+						"font-semibold text-[var(--text-primary)]",
+						compact ? "text-xs mb-2" : "text-sm mb-3",
+					)}
+				>
 					Top drivers
 				</h3>
 				{summary.top_drivers.length === 0 ? (

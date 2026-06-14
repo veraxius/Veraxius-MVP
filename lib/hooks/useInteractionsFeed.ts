@@ -11,6 +11,7 @@ export type FeedPost = {
 	userId: string;
 	userName: string;
 	userVerified: boolean;
+	userProfilePictureUrl?: string | null;
 	content: string;
 	createdAt: string;
 	reactions: { id: number; postId: number; userId: string; type: string }[];
