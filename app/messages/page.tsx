@@ -7,12 +7,13 @@ import { ConversationList } from "@/components/ConversationList";
 import { ConversationSearch } from "@/components/ConversationSearch";
 import { ChatWindow } from "@/components/ChatWindow";
 import { useConversations } from "@/lib/useConversations";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 
 type MessageTarget = {
 	id: string;
 	email: string;
-	name?: string;
+	name?: string | null;
 	profilePictureUrl?: string | null;
 };
 
@@ -26,6 +27,9 @@ function MessagesPageContent() {
 	const [selectedTarget, setSelectedTarget] = useState<MessageTarget | null>(null);
 	const [refreshToken, setRefreshToken] = useState(0);
 	const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+	const isMdUp = useMediaQuery("(min-width: 768px)");
+	const readingConversationId =
+		selectedId && (isMdUp || mobileView === "chat") ? selectedId : null;
 
 	useEffect(() => {
 		const auth = getAuth();
@@ -116,7 +120,7 @@ function MessagesPageContent() {
 					/>
 					<div className="flex-1 min-h-0 overflow-y-auto">
 						<ConversationList
-							activeId={selectedId}
+							activeId={readingConversationId}
 							onSelect={openConversation}
 							refreshToken={refreshToken}
 						/>
@@ -142,14 +146,20 @@ function MessagesPageContent() {
 						</div>
 					)}
 					<div className="flex-1 min-h-0 p-4 sm:p-6">
-						{selectedId ? (
-							<ChatWindow conversationId={selectedId} />
-						) : selectedTarget ? (
+						{selectedId || selectedTarget ? (
 							<ChatWindow
-								targetUserId={selectedTarget.id}
-								targetEmail={selectedTarget.email}
-								targetName={selectedTarget.name}
-								targetProfilePictureUrl={selectedTarget.profilePictureUrl}
+								conversationId={selectedId ?? undefined}
+								targetUserId={selectedTarget?.id}
+								targetEmail={selectedTarget?.email}
+								targetName={selectedTarget?.name}
+								targetProfilePictureUrl={selectedTarget?.profilePictureUrl}
+								isReading={
+									Boolean(
+										selectedId &&
+											readingConversationId &&
+											selectedId === readingConversationId,
+									)
+								}
 								onConversationCreated={(conv) => {
 									setSelectedId(conv.id);
 									setSelectedTarget(null);

@@ -26,12 +26,54 @@ router.get("/", async (req, res) => {
 				participants: { some: { userId } }
 			},
 			include: {
-				participants: { include: { user: true } },
+				participants: { include: { user: { select: participantUserSelect } } },
 				messages: { orderBy: { created_at: "desc" }, take: 1 }
 			},
-			orderBy: { created_at: "desc" }
 		});
-		return res.json(conversations);
+
+		const conversationIds = conversations.map((c) => c.id);
+		const participantReads =
+			conversationIds.length === 0
+				? []
+				: await prisma.conversationParticipant.findMany({
+						where: { userId, conversationId: { in: conversationIds } },
+						select: { conversationId: true, lastReadAt: true },
+					});
+
+		const lastReadByConversation = new Map(
+			participantReads.map((p) => [p.conversationId, p.lastReadAt]),
+		);
+
+		const unreadCounts = await Promise.all(
+			conversations.map(async (c) => {
+				const lastReadAt = lastReadByConversation.get(c.id) ?? null;
+				const unreadCount = await prisma.message.count({
+					where: {
+						conversationId: c.id,
+						senderId: { not: userId },
+						...(lastReadAt
+							? { created_at: { gt: lastReadAt } }
+							: { status: { in: ["sent", "delivered"] } }),
+					},
+				});
+				return [c.id, unreadCount] as const;
+			}),
+		);
+
+		const unreadByConversation = new Map(unreadCounts);
+
+		const enriched = conversations
+			.map((c) => ({
+				...c,
+				unreadCount: unreadByConversation.get(c.id) ?? 0,
+			}))
+			.sort((a, b) => {
+				const aTime = a.messages[0]?.created_at ?? a.created_at;
+				const bTime = b.messages[0]?.created_at ?? b.created_at;
+				return new Date(bTime).getTime() - new Date(aTime).getTime();
+			});
+
+		return res.json(enriched);
 	} catch (err) {
 		return internalError(res, err, "List conversations error:");
 	}

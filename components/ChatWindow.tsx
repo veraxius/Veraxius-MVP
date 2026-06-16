@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useConversations } from "@/lib/useConversations";
 import { useSocket } from "@/lib/useSocket";
 import { cn } from "@/lib/utils";
@@ -15,46 +16,164 @@ type Message = {
 	created_at: string;
 };
 
-export function ChatWindow({ conversationId, targetUserId, targetEmail, targetName, targetProfilePictureUrl, onConversationCreated }: { conversationId?: string; targetUserId?: string; targetEmail?: string; targetName?: string; targetProfilePictureUrl?: string | null; onConversationCreated?: (conv: { id: string }) => void }) {
+function isOptimisticMessageId(id: string) {
+	return id.startsWith("optimistic-");
+}
+
+function mergeMessageLists(prev: Message[], loaded: Message[], convId: string): Message[] {
+	const map = new Map<string, Message>();
+	for (const m of loaded) map.set(m.id, m);
+	for (const m of prev) {
+		if (map.has(m.id)) continue;
+		if (
+			m.conversationId === convId ||
+			m.conversationId === "pending" ||
+			isOptimisticMessageId(m.id)
+		) {
+			map.set(m.id, m);
+		}
+	}
+	return Array.from(map.values()).sort(
+		(a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+	);
+}
+
+export function ChatWindow({ conversationId, targetUserId, targetEmail, targetName, targetProfilePictureUrl, isReading = true, onConversationCreated }: { conversationId?: string; targetUserId?: string; targetEmail?: string; targetName?: string | null; targetProfilePictureUrl?: string | null; isReading?: boolean; onConversationCreated?: (conv: { id: string }) => void }) {
 	const { history, createConversation, list } = useConversations();
 	const socket = useSocket();
 	const [messages, setMessages] = useState<Message[]>([]);
+	const [loadingHistory, setLoadingHistory] = useState(false);
 	const [typing, setTyping] = useState<boolean>(false);
 	const [input, setInput] = useState("");
 	const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const convIdRef = useRef<string | undefined>(conversationId);
+	const convIdRef = useRef<string | undefined>(undefined);
+	const meIdRef = useRef<string | null>(null);
+	const pendingSendsRef = useRef<string[]>([]);
+	const preserveMessagesOnLoadRef = useRef(false);
+	const isReadingRef = useRef(isReading);
+	const messagesEndRef = useRef<HTMLDivElement | null>(null);
 	const [peerEmail, setPeerEmail] = useState<string | null>(targetEmail ?? null);
 	const [peerName, setPeerName] = useState<string | null>(null);
 	const [peerId, setPeerId] = useState<string | null>(targetUserId ?? null);
 	const [peerProfilePictureUrl, setPeerProfilePictureUrl] = useState<string | null>(targetProfilePictureUrl ?? null);
 	const [meId, setMeId] = useState<string | null>(null);
 
-	// Load history
 	useEffect(() => {
-		let mounted = true;
+		meIdRef.current = meId;
+	}, [meId]);
+
+	useEffect(() => {
+		isReadingRef.current = isReading;
+	}, [isReading]);
+
+	useEffect(() => {
+		if (!isReading || !conversationId) return;
+		socket.markRead(conversationId);
+	}, [isReading, conversationId, socket]);
+
+	function removeOptimisticMessage(optimisticId: string) {
+		setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+		pendingSendsRef.current = pendingSendsRef.current.filter((id) => id !== optimisticId);
+	}
+
+	function applyIncomingMessage(prev: Message[], msg: Message): Message[] {
+		if (prev.some((m) => m.id === msg.id)) return prev;
+
+		const myId = meIdRef.current;
+		if (myId && msg.senderId === myId) {
+			const pendingId = pendingSendsRef.current.shift();
+			if (pendingId) {
+				const pendingIdx = prev.findIndex((m) => m.id === pendingId);
+				if (pendingIdx >= 0) {
+					const next = [...prev];
+					next[pendingIdx] = msg;
+					return next;
+				}
+			}
+
+			const optimisticIdx = prev.findIndex(
+				(m) => isOptimisticMessageId(m.id) && m.senderId === myId && m.content === msg.content,
+			);
+			if (optimisticIdx >= 0) {
+				const optimisticId = prev[optimisticIdx].id;
+				pendingSendsRef.current = pendingSendsRef.current.filter((id) => id !== optimisticId);
+				const next = [...prev];
+				next[optimisticIdx] = msg;
+				return next;
+			}
+
+			// Duplicate socket echo for a message we already show.
+			return prev;
+		}
+
+		return [...prev, msg];
+	}
+
+	const loadHistory = useCallback(
+		async (convId: string, mode: "replace" | "merge" = "merge") => {
+			if (mode === "replace") setLoadingHistory(true);
+			try {
+				const data = await history(convId);
+				if (convIdRef.current !== convId) return;
+
+				const loaded = Array.isArray(data) ? (data as Message[]) : [];
+				setMessages((prev) =>
+					mode === "replace" ? loaded : mergeMessageLists(prev, loaded, convId),
+				);
+				if (isReadingRef.current) socket.markRead(convId);
+			} catch (err) {
+				// eslint-disable-next-line no-console
+				console.error("Load history error:", err);
+			} finally {
+				if (convIdRef.current === convId) setLoadingHistory(false);
+			}
+		},
+		[history, socket],
+	);
+
+	// Load history when conversation changes
+	useEffect(() => {
 		convIdRef.current = conversationId;
-		// cache current user id
 		const auth = getAuth();
-		setMeId(auth?.user?.id ?? null);
+		const userId = auth?.user?.id ?? null;
+		setMeId(userId);
+		meIdRef.current = userId;
+
 		if (!conversationId) {
 			setMessages([]);
+			setLoadingHistory(false);
+			return;
+		}
+
+		const preserveLocalMessages = preserveMessagesOnLoadRef.current;
+		preserveMessagesOnLoadRef.current = false;
+
+		if (preserveLocalMessages) {
+			setMessages((prev) =>
+				prev.map((m) =>
+					m.conversationId === "pending" ? { ...m, conversationId } : m,
+				),
+			);
+			void loadHistory(conversationId, "merge");
+		} else {
+			pendingSendsRef.current = [];
+			setMessages([]);
+			void loadHistory(conversationId, "replace");
+		}
+
+		socket.joinConversations();
+	}, [conversationId, loadHistory, socket]);
+
+	// Load peer profile for header
+	useEffect(() => {
+		if (!conversationId) {
 			setPeerEmail(targetEmail ?? null);
 			setPeerName(targetName ?? (targetEmail ? String(targetEmail).split("@")[0] : null));
 			setPeerId(targetUserId ?? null);
 			setPeerProfilePictureUrl(targetProfilePictureUrl ?? null);
-			return () => { mounted = false; };
+			return;
 		}
-		(async () => {
-			try {
-				const data = await history(conversationId);
-				if (mounted) setMessages(data);
-				socket.markRead(conversationId);
-			} catch (err) {
-				// eslint-disable-next-line no-console
-				console.error("Load history error:", err);
-			}
-		})();
-		// Load peer identity from conversations list
+
 		(async () => {
 			try {
 				const auth = getAuth();
@@ -79,63 +198,106 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 				setPeerProfilePictureUrl(targetProfilePictureUrl ?? null);
 			}
 		})();
-		return () => {
-			mounted = false;
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [conversationId]);
+	}, [conversationId, list, targetEmail, targetName, targetProfilePictureUrl, targetUserId]);
 
 	// Subscribe socket events
 	useEffect(() => {
-		const offNew = socket.onNewMessage((msg) => {
-			if (msg.conversationId === convIdRef.current) {
-				setMessages((prev) => [...prev, msg as Message]);
+		const attach = () => {
+			const offNew = socket.onNewMessage((msg) => {
+				if (msg.conversationId !== convIdRef.current) return;
+				setMessages((prev) => applyIncomingMessage(prev, msg as Message));
+			});
+			const offTyping = socket.onTyping((d) => {
+				if (d.conversationId === convIdRef.current) setTyping(true);
+			});
+			const offStop = socket.onStopTyping((d) => {
+				if (d.conversationId === convIdRef.current) setTyping(false);
+			});
+			const offRead = socket.onMessagesRead((_d) => {
+				// hook for read receipts if needed
+			});
+			return () => {
+				offNew?.();
+				offTyping?.();
+				offStop?.();
+				offRead?.();
+			};
+		};
+
+		let detach = attach();
+		const offConnect = socket.onConnect(() => {
+			socket.joinConversations();
+			detach?.();
+			detach = attach();
+			if (convIdRef.current) {
+				void loadHistory(convIdRef.current);
 			}
 		});
-		const offTyping = socket.onTyping((d) => {
-			if (d.conversationId === convIdRef.current) setTyping(true);
-		});
-		const offStop = socket.onStopTyping((d) => {
-			if (d.conversationId === convIdRef.current) setTyping(false);
-		});
-		const offRead = socket.onMessagesRead((_d) => {
-			// hook for read receipts if needed
-		});
-		return () => {
-			offNew?.();
-			offTyping?.();
-			offStop?.();
-			offRead?.();
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [conversationId]);
 
-	const handleSend = async () => {
+		return () => {
+			offConnect?.();
+			detach?.();
+		};
+	}, [conversationId, loadHistory, socket]);
+
+	useEffect(() => {
+		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, [messages]);
+
+	const handleSend = () => {
 		const content = input.trim();
 		if (!content) return;
-		// Ensure conversation exists; if not, create on first send
-		if (!convIdRef.current && targetUserId) {
-			try {
-				const conv = await createConversation(targetUserId);
-				convIdRef.current = conv.id;
-				const auth = getAuth();
-				const me = auth?.user?.id;
-				const other = (conv.participants || []).map((p: { user?: { id?: string; email?: string; name?: string | null; profilePictureUrl?: string | null } }) => p.user).find((u) => u?.id !== me) || null;
-				if (other?.id) setPeerId(other.id);
-				setPeerProfilePictureUrl(other?.profilePictureUrl ?? null);
-				if (other?.email) setPeerEmail(other.email);
-				if (other?.name) setPeerName(other.name);
-				onConversationCreated?.(conv);
-			} catch (err) {
-				// eslint-disable-next-line no-console
-				console.error("Create-on-send error:", err);
-				return;
-			}
-		}
-		if (!convIdRef.current) return;
-		socket.sendMessage(convIdRef.current, content);
+
+		const senderId = meIdRef.current ?? getAuth()?.user?.id;
+		if (!senderId) return;
+
+		const optimisticId = `optimistic-${crypto.randomUUID()}`;
+		const optimisticMsg: Message = {
+			id: optimisticId,
+			conversationId: convIdRef.current ?? "pending",
+			senderId,
+			content,
+			created_at: new Date().toISOString(),
+		};
+
+		pendingSendsRef.current.push(optimisticId);
+		setMessages((prev) => [...prev, optimisticMsg]);
 		setInput("");
-		socket.stopTyping(convIdRef.current);
+		if (convIdRef.current) socket.stopTyping(convIdRef.current);
+
+		void (async () => {
+			try {
+				let convId = convIdRef.current;
+				if (!convId && targetUserId) {
+					const conv = await createConversation(targetUserId);
+					convId = conv.id;
+					convIdRef.current = convId;
+					preserveMessagesOnLoadRef.current = true;
+					socket.joinConversations();
+					const auth = getAuth();
+					const me = auth?.user?.id;
+					const other = (conv.participants || [])
+						.map((p: { user?: { id?: string; email?: string; name?: string | null; profilePictureUrl?: string | null } }) => p.user)
+						.find((u: { id?: string } | undefined) => u?.id !== me) || null;
+					if (other?.id) setPeerId(other.id);
+					setPeerProfilePictureUrl(other?.profilePictureUrl ?? null);
+					if (other?.email) setPeerEmail(other.email);
+					if (other?.name) setPeerName(other.name);
+					onConversationCreated?.(conv);
+				}
+
+				if (!convId) {
+					removeOptimisticMessage(optimisticId);
+					return;
+				}
+
+				socket.sendMessage(convId, content);
+			} catch (err) {
+				removeOptimisticMessage(optimisticId);
+				// eslint-disable-next-line no-console
+				console.error("Send message error:", err);
+			}
+		})();
 	};
 
 	const handleTyping = (value: string) => {
@@ -152,21 +314,46 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 		<div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] overflow-hidden">
 			{/* Top navbar inside chat with peer identity */}
 			<div className="min-h-12 px-4 py-2 border-b border-[var(--divider)] flex items-center justify-between shrink-0">
-				<div className="flex items-center gap-2 min-w-0">
-					<UserAvatar
-						userId={peerId ?? "peer"}
-						name={peerName}
-						email={peerEmail}
-						profilePictureUrl={peerProfilePictureUrl}
-						size="sm"
-					/>
-					<div className="min-w-0">
-						<p className="vx-body text-[var(--text-primary)] truncate">{peerName ?? "—"}</p>
-						<p className="vx-mono-sm text-[var(--text-tertiary)] truncate">{peerEmail ?? ""}</p>
+				{peerId ? (
+					<Link
+						href={`/profile/${peerId}`}
+						className="flex items-center gap-2 min-w-0 rounded-lg p-1 -m-1 transition-colors hover-bg-surface"
+						title="View profile"
+					>
+						<UserAvatar
+							userId={peerId}
+							name={peerName}
+							email={peerEmail}
+							profilePictureUrl={peerProfilePictureUrl}
+							size="sm"
+						/>
+						<div className="min-w-0">
+							<p className="vx-body text-[var(--text-primary)] truncate hover:underline">
+								{peerName ?? "—"}
+							</p>
+							<p className="vx-mono-sm text-[var(--text-tertiary)] truncate">{peerEmail ?? ""}</p>
+						</div>
+					</Link>
+				) : (
+					<div className="flex items-center gap-2 min-w-0">
+						<UserAvatar
+							userId="peer"
+							name={peerName}
+							email={peerEmail}
+							profilePictureUrl={peerProfilePictureUrl}
+							size="sm"
+						/>
+						<div className="min-w-0">
+							<p className="vx-body text-[var(--text-primary)] truncate">{peerName ?? "—"}</p>
+							<p className="vx-mono-sm text-[var(--text-tertiary)] truncate">{peerEmail ?? ""}</p>
+						</div>
 					</div>
-				</div>
+				)}
 			</div>
 			<div className="flex-1 overflow-y-auto p-4 space-y-3">
+				{loadingHistory && messages.length === 0 ? (
+					<p className="vx-body-sm text-tertiary text-center py-8">Loading messages…</p>
+				) : null}
 				{messages.map((m) => (
 					<div
 						key={m.id}
@@ -195,6 +382,7 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 				{typing && (
 					<p className="vx-body-sm text-tertiary">typing...</p>
 				)}
+				<div ref={messagesEndRef} aria-hidden />
 			</div>
 			<div className="border-t border-[var(--divider)] p-3 flex gap-2 shrink-0 min-w-0">
 				<input

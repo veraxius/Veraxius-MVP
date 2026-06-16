@@ -351,8 +351,13 @@ export default function ProfileDomains({
 			<div className="border border-vx-divider rounded-xl bg-vx-panel overflow-hidden">
 				{hasPublic && (
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4">
-						{visibleDomains.map((d) => (
-							<DomainRow key={d.domain_name} userId={userId} domain={d} />
+						{visibleDomains.map((d, idx) => (
+							<DomainRow
+								key={d.domain_name}
+								userId={userId}
+								domain={d}
+								isLast={idx === visibleDomains.length - 1}
+							/>
 						))}
 					</div>
 				)}

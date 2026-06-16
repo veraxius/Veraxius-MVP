@@ -256,13 +256,24 @@ io.on("connection", (socket) => {
 
     try {
 
+      const readerId = (socket as any).userId as string;
+      const now = new Date();
+
+      await prisma.conversationParticipant.updateMany({
+
+        where: { conversationId, userId: readerId },
+
+        data: { lastReadAt: now },
+
+      });
+
       await prisma.message.updateMany({
 
         where: {
 
           conversationId,
 
-          senderId: { not: (socket as any).userId }
+          senderId: { not: readerId }
 
         },
 
@@ -270,7 +281,7 @@ io.on("connection", (socket) => {
 
       });
 
-      io.to(conversationId).emit("messages_read", { conversationId, userId });
+      io.to(conversationId).emit("messages_read", { conversationId, userId: readerId });
 
     } catch (err) {
 
