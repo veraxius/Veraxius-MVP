@@ -44,7 +44,7 @@ export default function ProfilePage() {
 
 	const currentAuth = typeof window !== "undefined" ? getAuth() : null;
 	const isOwnProfile = currentAuth?.user?.id === userId;
-	const { summary, refresh: refreshSummary } = useAIMScore(userId);
+	const { summary, loading: summaryLoading, error: summaryError, refresh: refreshSummary } = useAIMScore(userId);
 
 	const registeredName =
 		summary?.user.name?.trim() ||
@@ -85,30 +85,53 @@ export default function ProfilePage() {
 		>
 			<h1 className="text-xl sm:text-2xl font-semibold text-center">Adaptive Integrity System</h1>
 
-			<div className="flex flex-row items-start gap-3 sm:gap-5 min-w-0">
-				<div className="flex flex-col items-center shrink-0 w-24 sm:w-28">
-					<UserAvatar
-						userId={userId}
-						name={summary?.user.name ?? (isOwnProfile ? currentAuth?.user?.name : null)}
-						email={summary?.user.email ?? currentAuth?.user?.email}
-						profilePictureUrl={summary?.user.profilePictureUrl ?? null}
-						size="lg"
-						editable={isOwnProfile}
-						onUploaded={() => void refreshSummary()}
-						className="w-full"
-					/>
-					{registeredName ? (
-						<p
-							className="mt-2 w-full text-center text-sm sm:text-base font-semibold text-[var(--text-primary)] leading-tight break-words"
-							title={registeredName}
-						>
-							{registeredName}
-						</p>
-					) : null}
+			<div className="w-full flex flex-col gap-4 sm:gap-6 min-w-0">
+				<div className="flex w-full min-w-0 flex-col items-center gap-4 sm:relative sm:min-h-[11rem] md:min-h-[12.5rem]">
+					<div className="flex w-full max-w-[6.5rem] flex-col items-center sm:absolute sm:left-0 sm:top-0 sm:z-10 sm:w-24 md:w-28">
+						<UserAvatar
+							userId={userId}
+							name={summary?.user.name ?? (isOwnProfile ? currentAuth?.user?.name : null)}
+							email={summary?.user.email ?? currentAuth?.user?.email}
+							profilePictureUrl={summary?.user.profilePictureUrl ?? null}
+							size="lg"
+							editable={isOwnProfile}
+							onUploaded={() => void refreshSummary()}
+							className="w-full gap-0"
+						/>
+						{registeredName ? (
+							<p
+								className="mt-1.5 w-full text-center text-sm sm:text-base font-semibold text-[var(--text-primary)] leading-tight break-words"
+								title={registeredName}
+							>
+								{registeredName}
+							</p>
+						) : null}
+					</div>
+
+					<div className="flex w-full min-w-0 justify-center sm:pl-[6.5rem] md:pl-32">
+						<AIMScoreHeroCard
+							userId={userId}
+							compact
+							section="summary"
+							summary={summary}
+							loading={summaryLoading && !summary}
+							error={summaryError}
+							refresh={refreshSummary}
+							className="w-full max-w-sm min-w-0"
+						/>
+					</div>
 				</div>
-				<div className="flex-1 w-full min-w-0">
-					<AIMScoreHeroCard userId={userId} compact />
-				</div>
+
+				<AIMScoreHeroCard
+					userId={userId}
+					compact
+					section="drivers"
+					summary={summary}
+					loading={summaryLoading && !summary}
+					error={summaryError}
+					refresh={refreshSummary}
+					className="w-full min-w-0"
+				/>
 			</div>
 
 			<AIMScoreHistoryChart userId={userId} pollIntervalMs={10_000} />

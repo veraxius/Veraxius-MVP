@@ -30,6 +30,8 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AIMCFG = require("../../aim.config.js");
 
+const AIM_MAX_SCORE: number = AIMCFG.maxScore ?? 100;
+
 /**
  * Rolling window for recomputeAIMScore() event queries.
  * Events older than this contribute ~0 to the score (exp(-λ×365) ≈ 0.000002 at λ=0.05),
@@ -55,6 +57,10 @@ export type ContextWeightInput = {
 
 function clamp(v: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, v));
+}
+
+function clampAimScore(v: number): number {
+	return clamp(v, 0, AIM_MAX_SCORE);
 }
 
 /**
@@ -382,7 +388,7 @@ export async function recordPeerFeedback(params: {
 	const cw = clamp(ndFactor * dvFactor, AIMCFG.contextClamp.min, AIMCFG.contextClamp.max);
 
 	// confidenceMultiplier = 0.5 + 0.5 × voterScore   (range [0.5, 1.0])
-	const effectiveVoterScore = Math.max(AIMCFG.baseScore, aimVoter);
+	const effectiveVoterScore = Math.min(1, Math.max(AIMCFG.baseScore, aimVoter));
 	const confMult = AIMCFG.confidence.multiplier.base + AIMCFG.confidence.multiplier.span * effectiveVoterScore;
 
 	const antiAbuseMult: number = AIMCFG.antiAbuse[suspicion];
@@ -502,7 +508,7 @@ export async function processAimSignal(input: ProcessSignalInput): Promise<Proce
 
 	// ── Compute multipliers ───────────────────────────────────────────────────
 	const cw       = getContextWeight(context);
-	const effectiveVoterScore = Math.max(AIMCFG.baseScore, voterScore ?? AIMCFG.baseScore);
+	const effectiveVoterScore = Math.min(1, Math.max(AIMCFG.baseScore, voterScore ?? AIMCFG.baseScore));
 	const confMult = AIMCFG.confidence.multiplier.base + AIMCFG.confidence.multiplier.span * effectiveVoterScore;
 
 	const effectiveDelta = buildEffectiveDelta({
@@ -953,7 +959,7 @@ export async function applyDecayToAllUsers(): Promise<ApplyDecaySummary> {
 		const dailyDecayRate = AIMCFG.decay.baseDailyRate * (1 - qualityShield) * tm;
 		const floor          = Math.max(AIMCFG.decay.minFloor, u.aimScore * AIMCFG.decay.decayFloorFactor);
 		const newDelta       = -dailyDecayRate;
-		const newScore       = clamp(u.aimScore + newDelta, floor, 1);
+		const newScore       = clamp(u.aimScore + newDelta, floor, AIM_MAX_SCORE);
 
 		if (newScore === u.aimScore) continue;
 
@@ -1244,15 +1250,14 @@ export async function recomputeAIMScore(
 
 	// All buckets are additive (contradiction/decay deltas are already negative)
 	let aim = AIMCFG.baseScore + base + reliability + consistency + peerValidation + contradiction + decay;
-	aim = clamp(aim, 0, 1);
+	aim = clampAimScore(aim);
 
 	// ── Optional legacy domain scoring (aimDomainScore table) ────────────────
 	if (domain) {
 		const domainEvents    = events.filter(e => e.domain === domain);
 		const interactionCount = domainEvents.length;
-		const scoreForDomain  = clamp(
+		const scoreForDomain  = clampAimScore(
 			AIMCFG.baseScore + domainEvents.reduce((s, e) => s + e.delta, 0),
-			0, 1,
 		);
 		const confidenceForDomain = Math.min(1, interactionCount / 80);
 		await prisma.aimDomainScore.upsert({
@@ -1278,9 +1283,9 @@ export async function recomputeAIMScore(
 			num += Number(d.score) * w * Number(d.confidence);
 			den += w * Number(d.confidence);
 		}
-		const domainComposite = den > 0 ? clamp(num / den, 0, 1) : aim;
+		const domainComposite = den > 0 ? clampAimScore(num / den) : aim;
 		const blend           = AIMCFG.domain.globalBlend;
-		aimGlobal = clamp(blend.generalWeight * aim + blend.domainCompositeWeight * domainComposite, 0, 1);
+		aimGlobal = clampAimScore(blend.generalWeight * aim + blend.domainCompositeWeight * domainComposite);
 	}
 
 	// ── Confidence & ranking score ────────────────────────────────────────────

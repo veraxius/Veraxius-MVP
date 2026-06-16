@@ -11,6 +11,9 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { notifyAimRefresh } from "@/lib/aimEvents";
 import { UserAvatar } from "@/components/UserAvatar";
+import { AIMGaugeRing } from "@/components/AIMGaugeRing";
+import { riskGaugeColorClass } from "@/lib/aimDisplay";
+import { useAIMScore } from "@/lib/hooks/useAIMScore";
 
 type ReactionType = "confiable" | "not_reliable";
 
@@ -23,17 +26,80 @@ type Post = {
   content: string;
   createdAt: string;
   reactions: { id: number; postId: number; userId: string; type: string }[];
-  comments: { id: number; postId: number; userId: string; userName: string; content: string; createdAt: string }[];
+  comments: {
+    id: number;
+    postId: number;
+    userId: string;
+    userName: string;
+    userProfilePictureUrl?: string | null;
+    content: string;
+    createdAt: string;
+  }[];
 };
+
+function isReliableReactionType(type: string) {
+  return type === "reliable" || type === "confiable";
+}
+
+function userHasReaction(
+  reactions: Post["reactions"],
+  userId: string,
+  type: ReactionType,
+) {
+  if (type === "confiable") {
+    return reactions.some((r) => r.userId === userId && isReliableReactionType(r.type));
+  }
+  return reactions.some((r) => r.userId === userId && r.type === type);
+}
+
+function applyOptimisticReaction(
+  posts: Post[],
+  postId: number,
+  userId: string,
+  type: ReactionType,
+): Post[] {
+  return posts.map((post) => {
+    if (post.id !== postId) return post;
+
+    const reactions = post.reactions ?? [];
+    const active = userHasReaction(reactions, userId, type);
+
+    if (active) {
+      return {
+        ...post,
+        reactions: reactions.filter((r) => {
+          if (r.userId !== userId) return true;
+          if (type === "confiable") return !isReliableReactionType(r.type);
+          return r.type !== type;
+        }),
+      };
+    }
+
+    return {
+      ...post,
+      reactions: [
+        ...reactions,
+        {
+          id: -(postId * 10 + (type === "confiable" ? 1 : 2)),
+          postId,
+          userId,
+          type,
+        },
+      ],
+    };
+  });
+}
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [compose, setCompose] = useState("");
-  const [myProfilePictureUrl, setMyProfilePictureUrl] = useState<string | null>(null);
   const [openMessages, setOpenMessages] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
+  const me = useMemo(() => getAuth()?.user ?? null, []);
+  const { summary: mySummary, loading: aimLoading, refresh: refreshMyAim } = useAIMScore(me?.id);
 
   async function loadPosts() {
     try {
@@ -51,46 +117,16 @@ export default function HomePage() {
 
   useEffect(() => {
     loadPosts();
+  }, []);
+
+  useEffect(() => {
     function onAvatarUpdated() {
+      void refreshMyAim();
       void loadPosts();
     }
     window.addEventListener("vx-avatar-updated", onAvatarUpdated);
     return () => window.removeEventListener("vx-avatar-updated", onAvatarUpdated);
-  }, []);
-
-  useEffect(() => {
-    const auth = getAuth();
-    const userId = auth?.user?.id;
-    if (!userId) return;
-
-    async function loadMyAvatar() {
-      try {
-        const resp = await fetch(`/api/users/${userId}/aim-summary`, { cache: "no-store" });
-        const data = await resp.json();
-        if (resp.ok) {
-          setMyProfilePictureUrl(data?.user?.profilePictureUrl ?? null);
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    void loadMyAvatar();
-
-    function onAvatarUpdated(e: Event) {
-      const detail = (e as CustomEvent<{ profilePictureUrl?: string }>).detail;
-      if (detail?.profilePictureUrl) {
-        setMyProfilePictureUrl(detail.profilePictureUrl);
-      } else {
-        void loadMyAvatar();
-      }
-    }
-
-    window.addEventListener("vx-avatar-updated", onAvatarUpdated);
-    return () => window.removeEventListener("vx-avatar-updated", onAvatarUpdated);
-  }, []);
-
-  const me = useMemo(() => getAuth()?.user ?? null, []);
+  }, [refreshMyAim]);
 
   async function submitPost() {
     const text = compose.trim();
@@ -129,6 +165,11 @@ export default function HomePage() {
       return;
     }
 
+    const userId = auth.user.id;
+    const snapshot = posts;
+
+    setPosts((current) => applyOptimisticReaction(current, postId, userId, type));
+
     try {
       setError(null);
 
@@ -141,8 +182,10 @@ export default function HomePage() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data?.error || "Reaction failed");
 
-      await loadPosts();
+      notifyAimRefresh();
+      void loadPosts();
     } catch (e: any) {
+      setPosts(snapshot);
       setError(e?.message || "Reaction failed");
     }
   }
@@ -192,40 +235,75 @@ export default function HomePage() {
         </div>
 
         <section className="vx-feed-card mb-8 w-full rounded-2xl p-4 sm:p-5">
+          {me?.id ? (
+            <div className="mb-4 space-y-5 border-b border-[var(--divider)] pb-4">
+              <div className="flex flex-col items-center gap-5 lg:relative lg:min-h-[12.5rem] lg:justify-center">
+                <div className="flex w-full max-w-md flex-col items-center text-center lg:absolute lg:left-6 xl:left-8 lg:top-1/2 lg:z-10 lg:max-w-[min(46%,20rem)] xl:max-w-[min(48%,22rem)] lg:-translate-y-1/2 lg:items-start lg:text-left">
+                  <p className="vx-mono text-amber text-base sm:text-lg md:text-xl font-semibold leading-tight tracking-wide">
+                    Trust proven in motion
+                  </p>
+                  <div className="mt-1.5 sm:mt-2 w-full text-xs sm:text-sm text-[var(--text-secondary)] leading-snug tracking-[0.04em] sm:tracking-[0.05em]">
+                    <span className="block">Adaptive trust evaluation through</span>
+                    <span className="block">behavior, signals, explainability,</span>
+                    <span className="block">and governance.</span>
+                  </div>
+                </div>
+
+                {aimLoading && !mySummary ? (
+                  <div className="h-36 w-36 sm:h-44 sm:w-44 shrink-0 rounded-full bg-[var(--surface-subtle)] animate-pulse" />
+                ) : mySummary ? (
+                  <Link href={`/profile/${me.id}`} className="shrink-0" title="View your AIM profile">
+                    <AIMGaugeRing
+                      aimFraction={mySummary.global_score}
+                      colorClass={riskGaugeColorClass(mySummary.risk_level)}
+                      compact
+                    />
+                  </Link>
+                ) : null}
+              </div>
+
+              <TrustFeatureMiniCards />
+            </div>
+          ) : null}
+
           <div className="flex items-start gap-3">
             {me?.id ? (
               <UserAvatar
                 userId={me.id}
                 name={me.name}
                 email={me.email}
-                profilePictureUrl={myProfilePictureUrl}
+                profilePictureUrl={mySummary?.user?.profilePictureUrl ?? null}
                 size="md"
               />
             ) : null}
 
-            <div className="flex-1">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 min-[420px]:flex-row min-[420px]:items-start min-[420px]:gap-2 sm:gap-3">
               <textarea
                 value={compose}
                 onChange={(e) => setCompose(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void submitPost();
+                  }
+                }}
                 placeholder="What would you like to share today?"
                 className={cn(
-                  "w-full resize-none rounded-xl border bg-surface-subtle px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
+                  "flex-1 min-w-0 resize-none rounded-xl border bg-surface-subtle px-4 py-2.5 min-h-11 text-base sm:text-sm outline-none",
                   "border-subtle focus:border-[var(--amber-border)] focus:bg-[var(--surface-input-focus)]",
                   "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
                   "transition-colors"
                 )}
-                rows={3}
+                rows={2}
               />
 
-              <div className="mt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={submitPost}
-                  className="vx-btn-primary vx-post-btn rounded-xl px-5 min-h-11 text-sm font-semibold sm:text-base"
-                >
-                  POST
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={submitPost}
+                className="vx-btn-primary vx-post-btn min-h-11 shrink-0 self-end rounded-xl px-4 text-sm font-semibold min-[420px]:self-auto sm:px-5 sm:text-base"
+              >
+                POST
+              </button>
             </div>
           </div>
         </section>
@@ -290,6 +368,70 @@ export default function HomePage() {
   );
 }
 
+function TrustFeatureIcon({ type }: { type: "lightbulb" | "explainable" | "document" }) {
+  const className =
+    "h-4 w-4 shrink-0 text-[#FFD99A] drop-shadow-[0_0_2px_rgba(255,201,120,0.35)]";
+
+  if (type === "lightbulb") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 18h6M10 22h4" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 2a7 7 0 00-4 12.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26A7 7 0 0012 2z"
+        />
+      </svg>
+    );
+  }
+
+  if (type === "explainable") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <circle cx="12" cy="12" r="3" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 2v6h6M8 13h8M8 17h8" />
+    </svg>
+  );
+}
+
+const TRUST_FEATURE_CARDS = [
+  { id: "realtime", label: "Real-time evaluation", icon: "lightbulb" as const },
+  { id: "explainable", label: "Explainable", icon: "explainable" as const },
+  { id: "auditable", label: "Auditable", icon: "document" as const },
+];
+
+function TrustFeatureMiniCards() {
+  return (
+    <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2 sm:gap-3">
+      {TRUST_FEATURE_CARDS.map((card) => (
+        <div
+          key={card.id}
+          className={cn(
+            "flex items-center justify-center gap-2 rounded-xl border border-[var(--divider)]",
+            "bg-[var(--surface-subtle)] px-2.5 py-2.5 sm:px-3 sm:py-3",
+            "text-[11px] sm:text-xs font-medium text-[var(--text-secondary)] text-center min-w-0",
+          )}
+        >
+          <TrustFeatureIcon type={card.icon} />
+          <span className="leading-tight">{card.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PostCard({
   post,
   onReact,
@@ -334,27 +476,6 @@ function PostCard({
     return `${Math.floor(diff / 86400)}d`;
   }
 
-  function initials(name: string) {
-    const parts = name.split(/\s+/).filter(Boolean);
-    const first = parts[0]?.[0] ?? "";
-    const second = parts[1]?.[0] ?? "";
-    return (first + second).toUpperCase() || name.slice(0, 2).toUpperCase();
-  }
-
-  function nameColor(name: string) {
-    const hues = [18, 32, 140, 200, 260];
-    const h = hues[Math.abs(hashCode(name)) % hues.length];
-    return `hsl(${h} 60% 35%)`;
-  }
-
-  function hashCode(s: string) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) {
-      h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-    }
-    return h;
-  }
-
   async function handleCommentSubmit() {
     const cleanText = text.trim();
     if (!cleanText) return;
@@ -375,7 +496,7 @@ function PostCard({
           />
         </Link>
 
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
             <Link href={`/profile/${post.userId}`} className="font-semibold hover:underline truncate max-w-full">
               {post.userName}
@@ -439,16 +560,23 @@ function PostCard({
               <div className="space-y-2">
                 {comments.map((c) => (
                   <div key={c.id} className="flex items-start gap-2">
-                    <div
-                      className="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold"
-                      style={{ backgroundColor: nameColor(c.userName), color: "#fff" }}
-                    >
-                      {initials(c.userName)}
-                    </div>
+                    <Link href={`/profile/${c.userId}`} className="shrink-0" title={c.userName}>
+                      <UserAvatar
+                        userId={c.userId}
+                        name={c.userName}
+                        profilePictureUrl={c.userProfilePictureUrl}
+                        size="sm"
+                      />
+                    </Link>
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="text-sm">
-                        <span className="font-medium">{c.userName}</span>{" "}
+                        <Link
+                          href={`/profile/${c.userId}`}
+                          className="font-medium hover:underline"
+                        >
+                          {c.userName}
+                        </Link>{" "}
                         <span className="text-tertiary">· {relTime(c.createdAt)}</span>
                       </div>
 
@@ -458,7 +586,7 @@ function PostCard({
                 ))}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center">
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -480,7 +608,7 @@ function PostCard({
                 <button
                   type="button"
                   onClick={handleCommentSubmit}
-                  className="vx-btn-primary rounded-xl px-4 min-h-11 shrink-0 text-sm font-semibold"
+                  className="vx-btn-primary min-h-11 shrink-0 self-end rounded-xl px-4 text-sm font-semibold min-[400px]:self-auto"
                 >
                   Reply
                 </button>

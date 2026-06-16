@@ -10,6 +10,8 @@ import jwt from "jsonwebtoken";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AIMCFG = require("../../aim.config.js");
 
+const AIM_MAX_SCORE: number = AIMCFG.maxScore ?? 100;
+
 const LAMBDA = 0.05; // recency decay rate
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -166,7 +168,7 @@ export async function recalculateDomainScore(
 	const sumDeltas = events.reduce((s, e) => s + e.effectiveDelta, 0);
 	// Spec: domainScore = clamp(0.50 + Σ(domain effectiveEventDeltas), 0, 1)
 	// All users start neutral at 0.50; the score shifts up/down based on votes.
-	const domainScore = clamp(0.5 + sumDeltas, 0, 1);
+	const domainScore = clamp(AIMCFG.baseScore + sumDeltas, 0, AIM_MAX_SCORE);
 
 	// Domain confidence calculation
 	const totalSignals = events.length;

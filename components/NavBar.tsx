@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearAuth, getAuth } from "@/lib/auth";
 import { formatAimScoreLabel } from "@/lib/aimDisplay";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { VeraxiusLogo } from "@/components/VeraxiusLogo";
 export function NavBar() {
@@ -68,39 +69,75 @@ export function NavBar() {
 			className="w-full sticky top-0 z-40"
 			style={{ backgroundColor: "var(--bg-panel)", borderBottom: "0.1px solid var(--amber)" }}
 		>
-			<div className="w-full max-w-[100vw] px-4 sm:px-6 lg:px-8">
-				<div className="grid h-14 sm:h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-2 min-w-0">
+			<div className="w-full max-w-[100vw] px-3 sm:px-6 lg:px-8 overflow-x-clip">
+				<div
+					className={cn(
+						"grid h-14 sm:h-16 items-center gap-x-2 min-w-0",
+						showActions && aim
+							? "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
+							: "grid-cols-[minmax(0,1fr)_auto]",
+					)}
+				>
 					<Link
 						href="/home"
 						aria-label="Veraxius Home"
-						className="inline-flex items-center justify-self-start shrink-0 min-h-11 overflow-visible min-w-0"
+						className="justify-self-start relative z-10 inline-flex items-center min-h-11 min-w-0 max-w-full overflow-hidden"
 					>
 						<VeraxiusLogo variant="navbar" priority />
 					</Link>
 
-					<div className="flex justify-center px-1 min-w-0">
-						{showActions && aim ? (
-							<span className="inline-flex items-center rounded-full px-2 py-1 sm:px-2.5 sm:py-1.5 min-h-8 sm:min-h-11 border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)] whitespace-nowrap max-w-full">
-								<span className="vx-mono text-amber vx-aim-neon mr-0.5 sm:mr-1 shrink-0">AIM</span>
-								<span className="font-semibold text-[var(--text-primary)] truncate">
-									{formatAimScoreLabel(aim.score)}
-								</span>
+					{showActions && aim ? (
+						<Link
+							href="/profile"
+							className={cn(
+								"justify-self-center z-[5] inline-flex items-center rounded-full",
+								"px-1.5 py-1 sm:px-2.5 sm:py-1.5 min-h-8 sm:min-h-11",
+								"border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)]",
+								"min-w-0 max-w-full",
+							)}
+							title="View AIM profile"
+						>
+							<span className="vx-mono text-amber mr-0.5 sm:mr-1 shrink-0">AIM</span>
+							<span className="font-semibold text-[var(--text-primary)] truncate">
+								{formatAimScoreLabel(aim.score)}
 							</span>
-						) : null}
-					</div>
+						</Link>
+					) : null}
 
-					<div className="flex items-center justify-end justify-self-end gap-1 sm:gap-2 min-w-0">
+					<div className="justify-self-end relative z-10 flex items-center shrink-0 gap-1 sm:gap-2 min-w-0">
 						<ThemeToggle className={showActions ? "hidden md:inline-flex" : undefined} />
 						{showActions && (
 							<>
-							{/* Desktop / tablet actions */}
-							<div className="hidden md:flex items-center gap-2 min-w-0 shrink-0">
-								{!isMessages && (
+								{/* Desktop / tablet actions */}
+								<div className="hidden md:flex items-center gap-2 min-w-0 shrink-0">
+									{!isMessages && (
+										<Link
+											href="/messages"
+											className={navIconBtn}
+											aria-label="Go to messages"
+											title="Messages"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												width="18"
+												height="18"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												aria-hidden
+											>
+												<path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+											</svg>
+										</Link>
+									)}
 									<Link
-										href="/messages"
+										href="/profile"
 										className={navIconBtn}
-										aria-label="Go to messages"
-										title="Messages"
+										aria-label="Go to profile"
+										title="Profile"
 									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
@@ -114,88 +151,25 @@ export function NavBar() {
 											strokeLinejoin="round"
 											aria-hidden
 										>
-											<path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+											<path d="M20 21a8 8 0 0 0-16 0" />
+											<circle cx="12" cy="7" r="4" />
 										</svg>
 									</Link>
-								)}
-								<Link
-									href="/profile"
-									className={navIconBtn}
-									aria-label="Go to profile"
-									title="Profile"
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="18"
-										height="18"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										aria-hidden
+									<button
+										type="button"
+										onClick={handleSignOut}
+										className="rounded-full px-4 min-h-11 text-sm font-semibold border border-[var(--divider)] text-[var(--text-secondary)] hover-bg-surface"
+										aria-label="Sign out"
 									>
-										<path d="M20 21a8 8 0 0 0-16 0" />
-										<circle cx="12" cy="7" r="4" />
-									</svg>
-								</Link>
-								<button
-									type="button"
-									onClick={handleSignOut}
-									className="rounded-full px-4 min-h-11 text-sm font-semibold border border-[var(--divider)] text-[var(--text-secondary)] hover-bg-surface"
-									aria-label="Sign out"
-								>
-									Sign out
-								</button>
-							</div>
+										Sign out
+									</button>
+								</div>
 
-							{/* Mobile: messages + profile + menu */}
-							<div className="flex md:hidden items-center gap-1 sm:gap-1.5 shrink-0">
-								{!isMessages && (
-									<Link
-										href="/messages"
-										className={navIconBtn}
-										aria-label="Go to messages"
-										title="Messages"
-									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="18"
-											height="18"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											aria-hidden
-										>
-											<path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-										</svg>
-									</Link>
-								)}
-								<Link
-									href="/profile"
-									className={navIconBtn}
-									aria-label="Profile"
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="18"
-										height="18"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										aria-hidden
-									>
-										<path d="M20 21a8 8 0 0 0-16 0" />
-										<circle cx="12" cy="7" r="4" />
-									</svg>
-								</Link>
+								{/* Mobile: menu only — messages/profile live in the drawer */}
 								<button
 									type="button"
 									onClick={() => setMenuOpen((o) => !o)}
-									className="inline-flex items-center justify-center rounded-lg min-h-11 min-w-11 border border-[var(--divider)] text-[var(--text-primary)]"
+									className="inline-flex md:hidden items-center justify-center rounded-lg min-h-11 min-w-11 border border-[var(--divider)] text-[var(--text-primary)]"
 									aria-label={menuOpen ? "Close menu" : "Open menu"}
 									aria-expanded={menuOpen}
 								>
@@ -209,7 +183,6 @@ export function NavBar() {
 										</svg>
 									)}
 								</button>
-							</div>
 							</>
 						)}
 					</div>

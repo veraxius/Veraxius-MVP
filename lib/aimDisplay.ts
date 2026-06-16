@@ -1,13 +1,14 @@
 /**
- * AIM scores are stored on the backend as a 0–1 fraction (e.g. 0.5 = neutral baseline).
- * Product display: show that same scale with two decimals and a % sign → "0.50%" (not "50.00%").
+ * AIM scores use the same unit as display: 0.50 = 0.50%, 100 = 100.00%.
  */
 
-/** Canonical 0–1 value; accepts legacy API values scaled 0–100. */
+export const AIM_MAX_SCORE = 100;
+export const AIM_BASE_SCORE = 0.5;
+
+/** Canonical score in [0, maxScore]. */
 export function normalizeAimFraction(raw: number): number {
 	if (!Number.isFinite(raw)) return 0;
-	if (raw > 1) return Math.min(1, Math.max(0, raw / 100));
-	return Math.min(1, Math.max(0, raw));
+	return Math.min(AIM_MAX_SCORE, Math.max(0, raw));
 }
 
 /** Label shown in navbar and hero, e.g. 0.50% for stored score 0.5. */
@@ -15,21 +16,23 @@ export function formatAimScoreLabel(raw: number): string {
 	return `${normalizeAimFraction(raw).toFixed(2)}%`;
 }
 
-/** 0–100 scale for bar color thresholds and similar (0.5 → 50). */
-export function aimFractionToPercent(fraction: number): number {
-	if (!Number.isFinite(fraction)) return 0;
-	const f = normalizeAimFraction(fraction);
-	return Math.round(Math.min(100, Math.max(0, f * 100)) * 100) / 100;
+/** 0–100 progress from neutral to max (for bar colours). */
+export function aimFractionToPercent(score: number): number {
+	const s = normalizeAimFraction(score);
+	const range = AIM_MAX_SCORE - AIM_BASE_SCORE;
+	if (range <= 0) return 0;
+	const pct = ((s - AIM_BASE_SCORE) / range) * 100;
+	return Math.round(Math.min(100, Math.max(0, pct)) * 100) / 100;
 }
 
 /**
- * Ring fill matches the label number as % of 100 (0.42% → 0.42% of the arc).
- * Stored 1.0 ("1.00%" label) → full circle.
+ * Ring fill: display score / 100 (0.50% → 0.5% of arc, 100.00% → full circle).
+ * Measurement and labels are unchanged; only the arc ceiling moves from 1.00% to 100%.
  */
 export function aimGaugeFillFraction(raw: number): number {
-	const f = normalizeAimFraction(raw);
-	if (f >= 1) return 1;
-	return f / 100;
+	if (!Number.isFinite(raw)) return 0;
+	const score = Math.min(100, Math.max(0, raw));
+	return score / 100;
 }
 
 export type RiskLevel = "low" | "moderate" | "high" | "critical";

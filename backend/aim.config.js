@@ -1,6 +1,7 @@
 module.exports = {
   // ─── Core formula constants ──────────────────────────────────────────────
-  baseScore: 0.50,          // All new users start neutral
+  baseScore: 0.50,          // All new users start neutral (displayed as 0.50%)
+  maxScore: 100,            // Score ceiling (displayed as 100.00%)
   recencyLambda: 0.05,      // Exponential decay: Math.exp(-lambda * daysSince)
 
   // Score deltas scaled ×10 vs original spec (0.025 → 0.25, 0.02 → 0.20, etc.)

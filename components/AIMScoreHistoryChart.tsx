@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatAimScoreLabel, normalizeAimFraction } from "@/lib/aimDisplay";
+import { AIM_MAX_SCORE, formatAimScoreLabel, normalizeAimFraction } from "@/lib/aimDisplay";
 import { useAIMScore } from "@/lib/hooks/useAIMScore";
 import { cn } from "@/lib/utils";
 
@@ -104,9 +104,11 @@ function AIMLiveChart({ series }: { series: ChartSeries }) {
 		const innerW = width - PAD.left - PAD.right;
 		const innerH = CHART_HEIGHT - PAD.top - PAD.bottom;
 
+		const scores = points.map((p) => normalizeAimFraction(p.score));
+		const dataMax = Math.max(...scores, 0.5);
 		const yMin = 0;
-		const yMax = 1;
-		const yRange = yMax - yMin;
+		const yMax = Math.min(AIM_MAX_SCORE, Math.max(1, dataMax * 1.2));
+		const yRange = yMax - yMin || 1;
 
 		const tRange = tMax - tMin || 1;
 
@@ -123,7 +125,7 @@ function AIMLiveChart({ series }: { series: ChartSeries }) {
 				? `${linePath} L ${coords[coords.length - 1].x} ${PAD.top + innerH} L ${coords[0].x} ${PAD.top + innerH} Z`
 				: "";
 
-		const yTicks = [0, 0.5, 1];
+		const yTicks = [0, Math.round((yMax / 2) * 100) / 100, Math.round(yMax * 100) / 100];
 		const last = coords[coords.length - 1];
 
 		return { width, innerH, coords, linePath, areaPath, yTicks, yMin, yMax, last };

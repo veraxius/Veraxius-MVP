@@ -10,6 +10,21 @@ import { zContent, invalidPayload, internalError } from "../lib/validation";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AIMCFG = require("../../aim.config.js");
 const POST_TRUST_DELTA = AIMCFG.postTrustReactionIncrement ?? 0.2;
+const AIM_MAX_SCORE: number = AIMCFG.maxScore ?? 100;
+
+async function bumpAuthorAimScore(authorUserId: string, delta: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: authorUserId },
+    select: { aimScore: true },
+  });
+  if (!user) return;
+
+  const next = Math.min(AIM_MAX_SCORE, Math.max(0, user.aimScore + delta));
+  await prisma.user.update({
+    where: { id: authorUserId },
+    data: { aimScore: next },
+  });
+}
 
 const router = Router();
 
@@ -25,14 +40,30 @@ const CommentSchema = z.object({
   content: zContent,
 });
 
-async function enrichPostsWithAvatars<T extends { userId: string }>(posts: T[]) {
-  const userIds = [...new Set(posts.map((p) => p.userId))];
-  if (userIds.length === 0) {
-    return posts.map((p) => ({ ...p, userProfilePictureUrl: null as string | null }));
+async function enrichPostsWithAvatars<
+  T extends { userId: string; comments?: { userId: string }[] },
+>(posts: T[]) {
+  const userIds = new Set<string>();
+  for (const post of posts) {
+    userIds.add(post.userId);
+    for (const comment of post.comments ?? []) {
+      userIds.add(comment.userId);
+    }
+  }
+
+  if (userIds.size === 0) {
+    return posts.map((p) => ({
+      ...p,
+      userProfilePictureUrl: null as string | null,
+      comments: (p.comments ?? []).map((c) => ({
+        ...c,
+        userProfilePictureUrl: null as string | null,
+      })),
+    }));
   }
 
   const users = await prisma.user.findMany({
-    where: { id: { in: userIds } },
+    where: { id: { in: [...userIds] } },
     select: { id: true, profilePictureUrl: true },
   });
   const urlByUserId = new Map(users.map((u) => [u.id, u.profilePictureUrl]));
@@ -40,6 +71,10 @@ async function enrichPostsWithAvatars<T extends { userId: string }>(posts: T[]) 
   return posts.map((p) => ({
     ...p,
     userProfilePictureUrl: urlByUserId.get(p.userId) ?? null,
+    comments: (p.comments ?? []).map((c) => ({
+      ...c,
+      userProfilePictureUrl: urlByUserId.get(c.userId) ?? null,
+    })),
   }));
 }
 
@@ -130,14 +165,10 @@ router.post("/:id/react", requireAuth, async (req, res) => {
       });
 
       if (isTrustSignal) {
-        await prisma.user.update({
-          where: { id: authorUserId },
-          data: {
-            aimScore: {
-              increment: type === "confiable" ? -POST_TRUST_DELTA : POST_TRUST_DELTA,
-            },
-          },
-        });
+        await bumpAuthorAimScore(
+          authorUserId,
+          type === "confiable" ? -POST_TRUST_DELTA : POST_TRUST_DELTA,
+        );
       }
 
       return res.json({ toggled: "off" });
@@ -204,14 +235,10 @@ router.post("/:id/react", requireAuth, async (req, res) => {
 
       await processPendingEvents();
 
-      await prisma.user.update({
-        where: { id: authorUserId },
-        data: {
-          aimScore: {
-            increment: type === "confiable" ? POST_TRUST_DELTA : -POST_TRUST_DELTA,
-          },
-        },
-      });
+      await bumpAuthorAimScore(
+        authorUserId,
+        type === "confiable" ? POST_TRUST_DELTA : -POST_TRUST_DELTA,
+      );
     }
 
     return res.json({ toggled: "on" });
@@ -266,7 +293,10 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
       },
     });
 
-    return res.json(comment);
+    return res.json({
+      ...comment,
+      userProfilePictureUrl: user?.profilePictureUrl ?? null,
+    });
   } catch (err) {
     return internalError(res, err, "POST /api/posts/:id/comments");
   }

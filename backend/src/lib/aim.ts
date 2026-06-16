@@ -72,7 +72,7 @@ export async function calculateAimScore(userId: string) {
     score += ev.delta * weight * decay;
   }
 
-  // STATUS
+  score = Math.min(100, Math.max(0, score));
   let aimStatus: "increasing" | "decreasing" | "decaying" | "stable" =
     "stable";
 

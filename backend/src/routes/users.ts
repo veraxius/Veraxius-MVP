@@ -86,9 +86,13 @@ const DomainParamsSchema = z.object({
 	domainName: z.string().min(1).max(80),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const AIMCFG = require("../../aim.config.js");
+const AIM_MAX_SCORE: number = AIMCFG.maxScore ?? 100;
+
 function riskLevelFromFraction(fraction: number): "low" | "moderate" | "high" | "critical" {
 	const f = Number.isFinite(fraction)
-		? Math.min(1, Math.max(0, fraction > 1 ? fraction / 100 : fraction))
+		? Math.min(AIM_MAX_SCORE, Math.max(0, fraction))
 		: 0;
 	if (f >= 0.75) return "low";
 	if (f >= 0.5) return "moderate";
@@ -201,6 +205,7 @@ router.get("/:userId/aim-summary", async (req, res) => {
 		}
 
 		const fraction = Number(user.aimScore);
+		// Same unit as DB / scoring engine: 0–1 (e.g. 0.5). Clients format as "0.50%".
 		const global_score = Math.round(fraction * 1000) / 1000;
 
 		const confRaw = user.aimConfidence != null ? Number(user.aimConfidence) : null;
@@ -342,9 +347,9 @@ router.get("/:userId/domains/:domainName", async (req, res) => {
 			select: { createdAt: true, effectiveDelta: true },
 		});
 
-		let runningScore = 0.5;
+		let runningScore = AIMCFG.baseScore ?? 0.5;
 		const scoreHistory = historyEvents.map((e) => {
-			runningScore = Math.max(0, Math.min(1, runningScore + e.effectiveDelta));
+			runningScore = Math.max(0, Math.min(AIM_MAX_SCORE, runningScore + e.effectiveDelta));
 			return { date: e.createdAt, score: Math.round(runningScore * 100) / 100 };
 		});
 
@@ -353,7 +358,7 @@ router.get("/:userId/domains/:domainName", async (req, res) => {
 		return res.json({
 			domain_name: score.domainName,
 			domain_aim_score: score.domainAimScore,
-			display_percentage: Math.round(score.domainAimScore * 10000) / 100,
+			display_percentage: Math.round(score.domainAimScore * 100) / 100,
 			domain_confidence: score.domainConfidence,
 			interaction_count: score.interactionCount,
 			positive_signals: score.positiveSignals,

@@ -138,9 +138,8 @@ function DomainRow({
 }) {
 	const score = domain.domain_aim_score;           // raw 0–1 value
 
-	// Bar fills from 0% (score = 0.50, neutral start) to 100% (score = 1.00, max trust).
-	// Scores below 0.50 (net negative votes) keep the bar at 0%.
-	const barPct = Math.max(0, (score - 0.5) * 200); // 0.50→0%  0.75→50%  1.00→100%
+	// Bar fills from 0% (score = 0.50, neutral) to 100% (score = 100.00).
+	const barPct = Math.max(0, Math.min(100, ((score - 0.5) / (100 - 0.5)) * 100));
 
 	// Colour uses the full display_percentage scale so neutral (0.50) shows amber/yellow
 	// and clearly positive scores shift to green.
@@ -153,7 +152,7 @@ function DomainRow({
 			href={`/profile/${userId}#${anchorId}`}
 			id={anchorId}
 			scroll={false}
-			className="block h-full px-4 py-4 sm:px-5 sm:py-4 flex flex-col gap-2.5 rounded-xl border border-vx-divider bg-vx-panel transition-colors hover-bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-amber/50 min-w-0"
+			className="block h-full px-4 py-4 sm:px-5 sm:py-4 flex flex-col gap-2.5 rounded-lg transition-colors hover-bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-amber/50 min-w-0"
 		>
 			{/* Top row: icon + name | signals + trend */}
 			<div className="flex items-center justify-between gap-3">
@@ -179,14 +178,14 @@ function DomainRow({
 			</div>
 
 			{/* Score + bar row */}
-			<div className="flex items-center gap-4">
+			<div className="flex min-w-0 items-center gap-3 sm:gap-4">
 				<span
-					className="text-2xl font-bold leading-none tabular-nums w-20 shrink-0"
+					className="text-xl sm:text-2xl font-bold leading-none tabular-nums w-16 sm:w-20 shrink-0"
 					style={{ color: barColor }}
 				>
 					{formatAimScoreLabel(score)}
 				</span>
-				<div className="flex-1 flex flex-col gap-1">
+				<div className="flex-1 min-w-0 flex flex-col gap-1">
 					<AnimatedBar pct={barPct} color={barColor} />
 					<div className="flex justify-between text-[11px] text-vx-text-tertiary">
 						<span>{domain.interaction_count} interactions</span>
@@ -327,6 +326,8 @@ export default function ProfileDomains({
 	const publicDomains = data?.domains ?? [];
 	const inProgress = data?.domains_in_progress ?? [];
 	const hasPublic = publicDomains.length > 0;
+	const hasInProgress = isOwnProfile && inProgress.length > 0;
+	const hasAny = hasPublic || hasInProgress;
 	const MAX_VISIBLE = 6;
 	const visibleDomains = showAll ? publicDomains : publicDomains.slice(0, MAX_VISIBLE);
 	const hasMore = publicDomains.length > MAX_VISIBLE;
@@ -346,28 +347,31 @@ export default function ProfileDomains({
 				)}
 			</div>
 
-			{/* ── Public domain rows — single box ──────────────────────────── */}
-			{hasPublic ? (
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-					{visibleDomains.map((d) => (
-						<DomainRow key={d.domain_name} userId={userId} domain={d} />
-					))}
-				</div>
-			) : (
-				<div className="border border-vx-divider rounded-xl p-6 text-center bg-vx-panel">
-					<p className="text-vx-text-secondary text-sm">
-						No domains established yet. Keep posting to build domain credibility.
-					</p>
-				</div>
-			)}
+			{/* ── Unified domains box ─────────────────────────────────────── */}
+			<div className="border border-vx-divider rounded-xl bg-vx-panel overflow-hidden">
+				{hasPublic && (
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4">
+						{visibleDomains.map((d) => (
+							<DomainRow key={d.domain_name} userId={userId} domain={d} />
+						))}
+					</div>
+				)}
 
-			{/* ── In-progress domains (owner only) ────────────────────────── */}
-			{isOwnProfile && inProgress.length > 0 && (
-				<div className="space-y-2 mt-2">
-					<h3 className="text-sm font-semibold text-vx-text-secondary uppercase tracking-label">
-						In Progress
-					</h3>
-					<div className="border border-dashed border-vx-divider rounded-xl bg-vx-panel/60 overflow-hidden">
+				{!hasAny && (
+					<div className="p-6 text-center">
+						<p className="text-vx-text-secondary text-sm">
+							No domains established yet. Keep posting to build domain credibility.
+						</p>
+					</div>
+				)}
+
+				{hasInProgress && (
+					<div className={hasPublic ? "border-t border-vx-divider" : ""}>
+						<div className="px-4 sm:px-5 pt-3 pb-1">
+							<h3 className="text-sm font-semibold text-vx-text-secondary uppercase tracking-label">
+								In Progress
+							</h3>
+						</div>
 						{inProgress.map((d, idx) => (
 							<InProgressRow
 								key={d.domain_name}
@@ -376,8 +380,8 @@ export default function ProfileDomains({
 							/>
 						))}
 					</div>
-				</div>
-			)}
+				)}
+			</div>
 		</div>
 	);
 }
