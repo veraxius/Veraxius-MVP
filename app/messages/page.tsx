@@ -1,17 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { getAuth } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ConversationList } from "@/components/ConversationList";
 import { ConversationSearch } from "@/components/ConversationSearch";
 import { ChatWindow } from "@/components/ChatWindow";
+import { useConversations } from "@/lib/useConversations";
 import { cn } from "@/lib/utils";
 
-export default function MessagesPage() {
+type MessageTarget = {
+	id: string;
+	email: string;
+	name?: string;
+	profilePictureUrl?: string | null;
+};
+
+function MessagesPageContent() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const withUserId = searchParams.get("with");
+	const { list } = useConversations();
+	const openedFromQueryRef = useRef<string | null>(null);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
-	const [selectedTarget, setSelectedTarget] = useState<{ id: string; email: string; name?: string } | null>(null);
+	const [selectedTarget, setSelectedTarget] = useState<MessageTarget | null>(null);
 	const [refreshToken, setRefreshToken] = useState(0);
 	const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
@@ -23,19 +35,63 @@ export default function MessagesPage() {
 		}
 	}, [router]);
 
-	const hasChat = Boolean(selectedId || selectedTarget);
-
 	function openConversation(id: string) {
 		setSelectedId(id);
 		setSelectedTarget(null);
 		setMobileView("chat");
 	}
 
-	function openTarget(target: { id: string; email: string; name?: string }) {
+	function openTarget(target: MessageTarget) {
 		setSelectedTarget(target);
 		setSelectedId(null);
 		setMobileView("chat");
 	}
+
+	useEffect(() => {
+		const auth = getAuth();
+		if (!auth || !withUserId || withUserId === auth.user?.id) return;
+		if (openedFromQueryRef.current === withUserId) return;
+
+		let cancelled = false;
+
+		(async () => {
+			try {
+				const conversations = await list();
+				if (cancelled) return;
+
+				const existing = Array.isArray(conversations)
+					? conversations.find((c: { id: string; participants?: { user?: { id?: string } }[] }) =>
+							c.participants?.some((p) => p.user?.id === withUserId),
+						)
+					: null;
+
+				if (existing?.id) {
+					openedFromQueryRef.current = withUserId;
+					openConversation(existing.id);
+					return;
+				}
+
+				const resp = await fetch(`/api/users/${withUserId}/aim-summary`, { cache: "no-store" });
+				const data = await resp.json();
+				if (!resp.ok || cancelled) return;
+
+				openedFromQueryRef.current = withUserId;
+				openTarget({
+					id: data.user.id,
+					email: data.user.email,
+					name: data.user.name,
+					profilePictureUrl: data.user.profilePictureUrl,
+				});
+			} catch (err) {
+				// eslint-disable-next-line no-console
+				console.error("Open chat from profile error:", err);
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [withUserId, list]);
 
 	return (
 		<main
@@ -93,6 +149,7 @@ export default function MessagesPage() {
 								targetUserId={selectedTarget.id}
 								targetEmail={selectedTarget.email}
 								targetName={selectedTarget.name}
+								targetProfilePictureUrl={selectedTarget.profilePictureUrl}
 								onConversationCreated={(conv) => {
 									setSelectedId(conv.id);
 									setSelectedTarget(null);
@@ -111,5 +168,22 @@ export default function MessagesPage() {
 				</div>
 			</div>
 		</main>
+	);
+}
+
+export default function MessagesPage() {
+	return (
+		<Suspense
+			fallback={
+				<main
+					className="h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] w-full flex items-center justify-center"
+					style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
+				>
+					<p className="text-sm text-[var(--text-tertiary)]">Loading messages…</p>
+				</main>
+			}
+		>
+			<MessagesPageContent />
+		</Suspense>
 	);
 }

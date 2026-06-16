@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { API_URL, apiFetch } from "@/lib/api";
 
-type UserLite = { id: string; email: string; name?: string };
+type UserLite = { id: string; email: string; name?: string | null; profilePictureUrl?: string | null };
 
-export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target: { id: string; email: string; name?: string }) => void }) {
+export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target: UserLite) => void }) {
 	const [q, setQ] = useState("");
 	const [open, setOpen] = useState(false);
 	const [results, setResults] = useState<UserLite[]>([]);
@@ -70,7 +70,12 @@ export function ConversationSearch({ onSelectTarget }: { onSelectTarget: (target
 							<button
 								key={u.id}
 								onClick={() => {
-									onSelectTarget({ id: u.id, email: u.email, name: (u as any).name });
+									onSelectTarget({
+										id: u.id,
+										email: u.email,
+										name: u.name,
+										profilePictureUrl: u.profilePictureUrl,
+									});
 									setOpen(false);
 									setQ("");
 								}}

@@ -6,9 +6,11 @@ import { useSocket } from "@/lib/useSocket";
 import { cn } from "@/lib/utils";
 import { getAuth } from "@/lib/auth";
 
+import { UserAvatar } from "@/components/UserAvatar";
+
 type Conversation = {
 	id: string;
-	participants: { user: { id: string; email: string } }[];
+	participants: { user: { id: string; email: string; name?: string | null; profilePictureUrl?: string | null } }[];
 	messages?: { content: string; created_at: string }[];
 	created_at: string;
 };
@@ -89,11 +91,22 @@ export function ConversationList({
 							activeId === c.id ? "bg-surface-active" : ""
 						)}
 					>
-						<div className="flex items-center justify-between gap-2 min-w-0">
-							<p className="vx-body text-primary truncate min-w-0">{other?.email || "Unknown"}</p>
-							<span className="vx-mono-sm text-tertiary">{time}</span>
+						<div className="flex items-center gap-3 min-w-0">
+							<UserAvatar
+								userId={other?.id ?? "unknown"}
+								name={other?.name}
+								email={other?.email}
+								profilePictureUrl={other?.profilePictureUrl}
+								size="sm"
+							/>
+							<div className="flex-1 min-w-0">
+								<div className="flex items-center justify-between gap-2 min-w-0">
+									<p className="vx-body text-primary truncate min-w-0">{other?.name || other?.email || "Unknown"}</p>
+									<span className="vx-mono-sm text-tertiary shrink-0">{time}</span>
+								</div>
+								<p className="vx-body-sm text-tertiary mt-1 truncate">{preview}</p>
+							</div>
 						</div>
-						<p className="vx-body-sm text-tertiary mt-1">{preview}</p>
 					</button>
 				);
 			})}

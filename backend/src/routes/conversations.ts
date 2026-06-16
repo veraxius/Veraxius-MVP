@@ -16,6 +16,8 @@ const ConversationIdParamsSchema = z.object({
 	id: z.string().min(1).max(64),
 });
 
+const participantUserSelect = { id: true, email: true, name: true, profilePictureUrl: true } as const;
+
 router.get("/", async (req, res) => {
 	try {
 		const userId = req.userId as string;
@@ -77,7 +79,7 @@ router.post("/", async (req, res) => {
 				]
 			},
 			include: {
-				participants: { include: { user: { select: { id: true, email: true } } } },
+				participants: { include: { user: { select: participantUserSelect } } },
 				messages: { orderBy: { created_at: "desc" }, take: 1 }
 			}
 		});
@@ -91,7 +93,7 @@ router.post("/", async (req, res) => {
 				}
 			},
 			include: {
-				participants: { include: { user: { select: { id: true, email: true } } } },
+				participants: { include: { user: { select: participantUserSelect } } },
 				messages: { orderBy: { created_at: "desc" }, take: 1 }
 			}
 		});

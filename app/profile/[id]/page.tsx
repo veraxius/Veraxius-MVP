@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 import ProfileDomains from "@/components/ProfileDomains";
@@ -83,7 +84,22 @@ export default function ProfilePage() {
 			className="min-h-screen w-full max-w-6xl mx-auto min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6 sm:space-y-8"
 			style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
 		>
-			<h1 className="text-xl sm:text-2xl font-semibold text-center">Adaptive Integrity System</h1>
+			<div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-4">
+				<div aria-hidden className="min-w-0" />
+				<h1 className="text-xl sm:text-2xl font-semibold text-center px-1 min-w-0">
+					Adaptive Integrity System
+				</h1>
+				<div className="flex justify-end min-w-0">
+					{!isOwnProfile && currentAuth ? (
+						<Link
+							href={`/messages?with=${encodeURIComponent(userId)}`}
+							className="inline-flex items-center justify-center rounded-lg border border-[var(--divider)] bg-[var(--bg-panel)] px-3 sm:px-4 py-2 min-h-10 text-xs sm:text-sm font-semibold text-[var(--text-primary)] transition-colors whitespace-nowrap shrink-0 hover:bg-vx-amber hover:text-[var(--text-on-amber)] hover:border-vx-amber"
+						>
+							Send message
+						</Link>
+					) : null}
+				</div>
+			</div>
 
 			<div className="w-full flex flex-col gap-4 sm:gap-6 min-w-0">
 				<div className="flex w-full min-w-0 flex-col items-center gap-4 sm:relative sm:min-h-[11rem] md:min-h-[12.5rem]">
@@ -108,7 +124,7 @@ export default function ProfilePage() {
 						) : null}
 					</div>
 
-					<div className="flex w-full min-w-0 justify-center sm:pl-[6.5rem] md:pl-32">
+					<div className="flex w-full min-w-0 justify-center">
 						<AIMScoreHeroCard
 							userId={userId}
 							compact

@@ -5,6 +5,7 @@ import { useConversations } from "@/lib/useConversations";
 import { useSocket } from "@/lib/useSocket";
 import { cn } from "@/lib/utils";
 import { getAuth } from "@/lib/auth";
+import { UserAvatar } from "@/components/UserAvatar";
 
 type Message = {
 	id: string;
@@ -14,7 +15,7 @@ type Message = {
 	created_at: string;
 };
 
-export function ChatWindow({ conversationId, targetUserId, targetEmail, targetName, onConversationCreated }: { conversationId?: string; targetUserId?: string; targetEmail?: string; targetName?: string; onConversationCreated?: (conv: { id: string }) => void }) {
+export function ChatWindow({ conversationId, targetUserId, targetEmail, targetName, targetProfilePictureUrl, onConversationCreated }: { conversationId?: string; targetUserId?: string; targetEmail?: string; targetName?: string; targetProfilePictureUrl?: string | null; onConversationCreated?: (conv: { id: string }) => void }) {
 	const { history, createConversation, list } = useConversations();
 	const socket = useSocket();
 	const [messages, setMessages] = useState<Message[]>([]);
@@ -24,6 +25,8 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 	const convIdRef = useRef<string | undefined>(conversationId);
 	const [peerEmail, setPeerEmail] = useState<string | null>(targetEmail ?? null);
 	const [peerName, setPeerName] = useState<string | null>(null);
+	const [peerId, setPeerId] = useState<string | null>(targetUserId ?? null);
+	const [peerProfilePictureUrl, setPeerProfilePictureUrl] = useState<string | null>(targetProfilePictureUrl ?? null);
 	const [meId, setMeId] = useState<string | null>(null);
 
 	// Load history
@@ -37,6 +40,8 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 			setMessages([]);
 			setPeerEmail(targetEmail ?? null);
 			setPeerName(targetName ?? (targetEmail ? String(targetEmail).split("@")[0] : null));
+			setPeerId(targetUserId ?? null);
+			setPeerProfilePictureUrl(targetProfilePictureUrl ?? null);
 			return () => { mounted = false; };
 		}
 		(async () => {
@@ -58,16 +63,20 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 				const conv = Array.isArray(listData) ? listData.find((c: any) => c.id === conversationId) : null;
 				if (conv && me) {
 					const other = (conv.participants || []).map((p: any) => p.user).find((u: any) => u?.id !== me) || null;
+					setPeerId(other?.id ?? null);
+					setPeerProfilePictureUrl(other?.profilePictureUrl ?? null);
 					setPeerEmail(other?.email ?? targetEmail ?? null);
 					const fallbackName = other?.email ? String(other.email).split("@")[0] : undefined;
 					setPeerName(other?.name ?? fallbackName ?? targetName ?? null);
 				} else {
 					setPeerEmail(targetEmail ?? null);
 					setPeerName(targetName ?? (targetEmail ? String(targetEmail).split("@")[0] : null));
+					setPeerProfilePictureUrl(targetProfilePictureUrl ?? null);
 				}
 			} catch {
 				setPeerEmail(targetEmail ?? null);
 				setPeerName(targetName ?? (targetEmail ? String(targetEmail).split("@")[0] : null));
+				setPeerProfilePictureUrl(targetProfilePictureUrl ?? null);
 			}
 		})();
 		return () => {
@@ -109,6 +118,13 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 			try {
 				const conv = await createConversation(targetUserId);
 				convIdRef.current = conv.id;
+				const auth = getAuth();
+				const me = auth?.user?.id;
+				const other = (conv.participants || []).map((p: { user?: { id?: string; email?: string; name?: string | null; profilePictureUrl?: string | null } }) => p.user).find((u) => u?.id !== me) || null;
+				if (other?.id) setPeerId(other.id);
+				setPeerProfilePictureUrl(other?.profilePictureUrl ?? null);
+				if (other?.email) setPeerEmail(other.email);
+				if (other?.name) setPeerName(other.name);
 				onConversationCreated?.(conv);
 			} catch (err) {
 				// eslint-disable-next-line no-console
@@ -131,25 +147,19 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 		}, 1200);
 	};
 
-	function initials(text: string) {
-		const parts = String(text || "").split(/\s+/).filter(Boolean);
-		const a = parts[0]?.[0] ?? text?.[0] ?? "";
-		const b = parts[1]?.[0] ?? "";
-		return (a + b).toUpperCase() || (text || "").slice(0, 2).toUpperCase();
-	}
 
 	return (
 		<div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] overflow-hidden">
 			{/* Top navbar inside chat with peer identity */}
 			<div className="min-h-12 px-4 py-2 border-b border-[var(--divider)] flex items-center justify-between shrink-0">
 				<div className="flex items-center gap-2 min-w-0">
-					<div
-						className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-						style={{ backgroundColor: "var(--amber)", color: "var(--text-on-amber)" }}
-						title={peerEmail ?? undefined}
-					>
-						{initials(peerName ?? peerEmail ?? "U")}
-					</div>
+					<UserAvatar
+						userId={peerId ?? "peer"}
+						name={peerName}
+						email={peerEmail}
+						profilePictureUrl={peerProfilePictureUrl}
+						size="sm"
+					/>
 					<div className="min-w-0">
 						<p className="vx-body text-[var(--text-primary)] truncate">{peerName ?? "—"}</p>
 						<p className="vx-mono-sm text-[var(--text-tertiary)] truncate">{peerEmail ?? ""}</p>

@@ -114,7 +114,7 @@ router.get("/search", requireAuth, async (req, res) => {
 				email: { contains: q, mode: "insensitive" },
 				NOT: { id: userId }
 			},
-			select: { id: true, email: true },
+			select: { id: true, email: true, name: true, profilePictureUrl: true },
 			take: 10
 		});
 		return res.json(users);
