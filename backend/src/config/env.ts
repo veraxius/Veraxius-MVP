@@ -9,6 +9,7 @@ const REQUIRED_ENV: { key: string; hint?: string }[] = [
 		key: "GOOGLE_CLIENT_ID",
 		hint: "OAuth 2.0 Web client ID from https://console.cloud.google.com/apis/credentials",
 	},
+	{ key: "FRONTEND_URL", hint: "e.g. http://localhost:3000" },
 ];
 
 for (const { key, hint } of REQUIRED_ENV) {
