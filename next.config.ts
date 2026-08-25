@@ -9,8 +9,8 @@ function buildContentSecurityPolicy(): string {
 
   const scriptSrc =
     process.env.NODE_ENV === "development"
-      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com"
-      : "script-src 'self' 'unsafe-inline' https://accounts.google.com";
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://www.googletagmanager.com"
+      : "script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.googletagmanager.com";
 
   return [
     "default-src 'self'",
@@ -18,7 +18,7 @@ function buildContentSecurityPolicy(): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https:",
-    `connect-src 'self' ${apiUrl} https://accounts.google.com ws: wss:`,
+    `connect-src 'self' ${apiUrl} https://accounts.google.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com ws: wss:`,
     "frame-src https://accounts.google.com",
     "object-src 'none'",
     "base-uri 'self'",
