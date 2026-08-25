@@ -6,13 +6,17 @@ import { useConversations } from "@/lib/useConversations";
 import { useSocket } from "@/lib/useSocket";
 import { cn } from "@/lib/utils";
 import { getAuth } from "@/lib/auth";
+import { API_URL, apiFetch } from "@/lib/api";
+import { validatePostImageFile } from "@/lib/postImage";
 import { UserAvatar } from "@/components/UserAvatar";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 type Message = {
 	id: string;
 	conversationId: string;
 	senderId: string;
 	content: string;
+	imageUrl?: string | null;
 	created_at: string;
 };
 
@@ -45,6 +49,11 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 	const [loadingHistory, setLoadingHistory] = useState(false);
 	const [typing, setTyping] = useState<boolean>(false);
 	const [input, setInput] = useState("");
+	const [composeImage, setComposeImage] = useState<File | null>(null);
+	const [composeImagePreview, setComposeImagePreview] = useState<string | null>(null);
+	const [composeImageError, setComposeImageError] = useState<string | null>(null);
+	const [sendingImage, setSendingImage] = useState(false);
+	const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 	const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const convIdRef = useRef<string | undefined>(undefined);
 	const meIdRef = useRef<string | null>(null);
@@ -244,7 +253,115 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messages]);
 
+	async function ensureConversationId(): Promise<string | null> {
+		let convId = convIdRef.current;
+		if (!convId && targetUserId) {
+			const conv = await createConversation(targetUserId);
+			convId = conv.id;
+			convIdRef.current = convId;
+			preserveMessagesOnLoadRef.current = true;
+			socket.joinConversations();
+			const auth = getAuth();
+			const me = auth?.user?.id;
+			const other = (conv.participants || [])
+				.map((p: { user?: { id?: string; email?: string; name?: string | null; profilePictureUrl?: string | null } }) => p.user)
+				.find((u: { id?: string } | undefined) => u?.id !== me) || null;
+			if (other?.id) setPeerId(other.id);
+			setPeerProfilePictureUrl(other?.profilePictureUrl ?? null);
+			if (other?.email) setPeerEmail(other.email);
+			if (other?.name) setPeerName(other.name);
+			onConversationCreated?.(conv);
+		}
+		return convId ?? null;
+	}
+
+	function handleComposeImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+		const file = e.target.files?.[0];
+		e.target.value = "";
+		if (!file) return;
+
+		const validationError = validatePostImageFile(file);
+		if (validationError) {
+			setComposeImageError(validationError);
+			return;
+		}
+
+		setComposeImageError(null);
+		if (composeImagePreview) URL.revokeObjectURL(composeImagePreview);
+		setComposeImage(file);
+		setComposeImagePreview(URL.createObjectURL(file));
+	}
+
+	function clearComposeImage() {
+		if (composeImagePreview) URL.revokeObjectURL(composeImagePreview);
+		setComposeImage(null);
+		setComposeImagePreview(null);
+		setComposeImageError(null);
+	}
+
+	const handleSendImage = () => {
+		if (!composeImage || sendingImage) return;
+
+		const senderId = meIdRef.current ?? getAuth()?.user?.id;
+		if (!senderId) return;
+
+		const content = input.trim();
+		const optimisticId = `optimistic-${crypto.randomUUID()}`;
+		const optimisticMsg: Message = {
+			id: optimisticId,
+			conversationId: convIdRef.current ?? "pending",
+			senderId,
+			content,
+			imageUrl: composeImagePreview,
+			created_at: new Date().toISOString(),
+		};
+
+		const file = composeImage;
+		pendingSendsRef.current.push(optimisticId);
+		setMessages((prev) => [...prev, optimisticMsg]);
+		setInput("");
+		setComposeImage(null);
+		setComposeImagePreview(null);
+		setSendingImage(true);
+		if (convIdRef.current) socket.stopTyping(convIdRef.current);
+
+		void (async () => {
+			try {
+				const convId = await ensureConversationId();
+				if (!convId) {
+					removeOptimisticMessage(optimisticId);
+					return;
+				}
+
+				const formData = new FormData();
+				formData.append("content", content);
+				formData.append("image", file);
+
+				const resp = await apiFetch(`${API_URL}/api/conversations/${convId}/messages/image`, {
+					method: "POST",
+					body: formData,
+				});
+				if (!resp.ok) {
+					removeOptimisticMessage(optimisticId);
+				}
+				// On success, the server emits "new_message" over the socket, which
+				// reconciles the optimistic entry via pendingSendsRef — same as text.
+			} catch (err) {
+				removeOptimisticMessage(optimisticId);
+				// eslint-disable-next-line no-console
+				console.error("Send image error:", err);
+			} finally {
+				setSendingImage(false);
+			}
+		})();
+	};
+
 	const handleSend = () => {
+		if (composeImage) {
+			handleSendImage();
+			return;
+		}
+
 		const content = input.trim();
 		if (!content) return;
 
@@ -267,25 +384,7 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 
 		void (async () => {
 			try {
-				let convId = convIdRef.current;
-				if (!convId && targetUserId) {
-					const conv = await createConversation(targetUserId);
-					convId = conv.id;
-					convIdRef.current = convId;
-					preserveMessagesOnLoadRef.current = true;
-					socket.joinConversations();
-					const auth = getAuth();
-					const me = auth?.user?.id;
-					const other = (conv.participants || [])
-						.map((p: { user?: { id?: string; email?: string; name?: string | null; profilePictureUrl?: string | null } }) => p.user)
-						.find((u: { id?: string } | undefined) => u?.id !== me) || null;
-					if (other?.id) setPeerId(other.id);
-					setPeerProfilePictureUrl(other?.profilePictureUrl ?? null);
-					if (other?.email) setPeerEmail(other.email);
-					if (other?.name) setPeerName(other.name);
-					onConversationCreated?.(conv);
-				}
-
+				const convId = await ensureConversationId();
 				if (!convId) {
 					removeOptimisticMessage(optimisticId);
 					return;
@@ -367,14 +466,30 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 									: "border border-[var(--divider)] text-[var(--text-primary)]"
 							)}
 						>
-							<p
-								className={cn(
-									"vx-body-sm",
-									m.senderId === meId ? "!text-[var(--text-on-amber)]" : "!text-[var(--text-primary)]"
-								)}
-							>
-								{m.content}
-							</p>
+							{m.content && (
+								<p
+									className={cn(
+										"vx-body-sm",
+										m.senderId === meId ? "!text-[var(--text-on-amber)]" : "!text-[var(--text-primary)]"
+									)}
+								>
+									{m.content}
+								</p>
+							)}
+							{m.imageUrl && (
+								<button
+									type="button"
+									onClick={() => setLightboxSrc(m.imageUrl as string)}
+									className={cn("block w-full cursor-pointer", m.content ? "mt-2" : "mt-1")}
+								>
+									<img
+										src={m.imageUrl}
+										alt=""
+										className="max-h-64 w-full rounded-md object-cover"
+										loading="lazy"
+									/>
+								</button>
+							)}
 							<p
 								className={cn(
 									"vx-mono-sm mt-1",
@@ -391,28 +506,100 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 				)}
 				<div ref={messagesEndRef} aria-hidden />
 			</div>
-			<div className="border-t border-[var(--divider)] p-3 flex gap-2 shrink-0 min-w-0">
-				<input
-					value={input}
-					onChange={(e) => handleTyping(e.target.value)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter") handleSend();
-					}}
-					placeholder="Type a message..."
-					className={cn(
-						"flex-1 min-w-0 rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
-						"border-[var(--divider)] focus:border-[var(--amber-border)]",
-						"text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
-					)}
-				/>
-				<button
-					type="button"
-					onClick={handleSend}
-					className="vx-btn-primary rounded-lg px-5 min-h-11 shrink-0 text-sm font-semibold"
-				>
-					Send
-				</button>
+			<div className="border-t border-[var(--divider)] p-3 shrink-0 min-w-0 space-y-2">
+				{(composeImagePreview || composeImageError) && (
+					<div className="flex items-center gap-3">
+						{composeImagePreview && (
+							<div className="relative rounded-lg border border-[var(--divider)] bg-[var(--surface-subtle)] p-1">
+								<img
+									src={composeImagePreview}
+									alt=""
+									className="h-9 w-9 rounded-md object-cover"
+								/>
+								<button
+									type="button"
+									onClick={clearComposeImage}
+									aria-label="Remove image"
+									className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-[var(--divider)] bg-[var(--bg-panel)] text-[var(--text-secondary)] shadow-sm"
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="10"
+										height="10"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="3"
+										strokeLinecap="round"
+										aria-hidden
+									>
+										<path d="M6 6l12 12M18 6L6 18" />
+									</svg>
+								</button>
+							</div>
+						)}
+						{composeImageError && (
+							<span className="text-xs text-red">{composeImageError}</span>
+						)}
+					</div>
+				)}
+
+				<div className="flex gap-2">
+					<label className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-[var(--divider)] bg-transparent px-3 text-secondary shrink-0">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							aria-hidden
+						>
+							<rect x="3" y="3" width="18" height="18" rx="2" />
+							<circle cx="9" cy="9" r="2" />
+							<path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+						</svg>
+						<input
+							type="file"
+							accept={["image/jpeg", "image/png", "image/webp"].join(",")}
+							className="sr-only"
+							onChange={handleComposeImageChange}
+						/>
+					</label>
+
+					<input
+						value={input}
+						onChange={(e) => handleTyping(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") handleSend();
+						}}
+						placeholder="Type a message..."
+						className={cn(
+							"flex-1 min-w-0 rounded-lg border bg-transparent px-4 py-3 min-h-11 text-base sm:text-sm outline-none",
+							"border-[var(--divider)] focus:border-[var(--amber-border)]",
+							"text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+						)}
+					/>
+					<button
+						type="button"
+						onClick={handleSend}
+						disabled={sendingImage}
+						className={cn(
+							"vx-btn-primary rounded-lg px-5 min-h-11 shrink-0 text-sm font-semibold",
+							sendingImage && "opacity-70",
+						)}
+					>
+						Send
+					</button>
+				</div>
 			</div>
+
+			{lightboxSrc && (
+				<ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+			)}
 		</div>
 	);
 }

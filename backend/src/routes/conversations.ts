@@ -1,12 +1,80 @@
 import { Router } from "express";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { Readable } from "stream";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
+import { getIO } from "../lib/socket";
 import { zUuid, invalidPayload, internalError } from "../lib/validation";
 
 const router = Router();
 
 router.use(requireAuth);
+
+const ALLOWED_MESSAGE_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_MESSAGE_IMAGE_SIZE = 8 * 1024 * 1024;
+
+cloudinary.config({
+	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+	api_key: process.env.CLOUDINARY_API_KEY,
+	api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const messageImageUpload = multer({
+	storage: multer.memoryStorage(),
+	limits: { fileSize: MAX_MESSAGE_IMAGE_SIZE },
+	fileFilter: (_req, file, cb) => {
+		if (ALLOWED_MESSAGE_IMAGE_MIME.has(file.mimetype)) {
+			cb(null, true);
+			return;
+		}
+		cb(new Error("Invalid file type"));
+	},
+});
+
+function uploadMessageImageToCloudinary(buffer: Buffer): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const uploadStream = cloudinary.uploader.upload_stream(
+			{
+				folder: "veraxius/messages",
+				transformation: { width: 1600, height: 1600, crop: "limit" },
+			},
+			(error, result) => {
+				if (error) {
+					reject(error);
+					return;
+				}
+				if (!result?.secure_url) {
+					reject(new Error("Upload failed"));
+					return;
+				}
+				resolve(result.secure_url);
+			},
+		);
+
+		Readable.from(buffer).pipe(uploadStream);
+	});
+}
+
+function handleMessageImageUpload(
+	req: import("express").Request,
+	res: import("express").Response,
+	next: import("express").NextFunction,
+) {
+	messageImageUpload.single("image")(req, res, (err: unknown) => {
+		if (err instanceof multer.MulterError) {
+			if (err.code === "LIMIT_FILE_SIZE") {
+				return res.status(400).json({ error: "Image too large" });
+			}
+			return res.status(400).json({ error: "Upload failed" });
+		}
+		if (err) {
+			return res.status(400).json({ error: "Invalid file type" });
+		}
+		return next();
+	});
+}
 
 const CreateConversationSchema = z.object({
 	targetUserId: zUuid,
@@ -100,6 +168,51 @@ router.get("/:id/messages", async (req, res) => {
 		return res.json(messages);
 	} catch (err) {
 		return internalError(res, err, "Messages error:");
+	}
+});
+
+router.post("/:id/messages/image", handleMessageImageUpload, async (req, res) => {
+	try {
+		const params = ConversationIdParamsSchema.safeParse(req.params);
+		if (!params.success) return invalidPayload(res);
+
+		const userId = req.userId as string;
+		const conversationId = params.data.id;
+
+		const part = await prisma.conversationParticipant.findFirst({
+			where: { conversationId, userId },
+		});
+		if (!part) return res.status(403).json({ error: "Forbidden" });
+
+		if (!req.file) {
+			return res.status(400).json({ error: "No image file provided" });
+		}
+
+		if (
+			!process.env.CLOUDINARY_CLOUD_NAME ||
+			!process.env.CLOUDINARY_API_KEY ||
+			!process.env.CLOUDINARY_API_SECRET
+		) {
+			return res.status(500).json({ error: "Upload service not configured" });
+		}
+
+		const content = typeof req.body?.content === "string" ? req.body.content.trim().slice(0, 10_000) : "";
+		const imageUrl = await uploadMessageImageToCloudinary(req.file.buffer);
+
+		const message = await prisma.message.create({
+			data: {
+				conversationId,
+				senderId: userId,
+				content,
+				imageUrl,
+			},
+		});
+
+		getIO()?.to(conversationId).emit("new_message", message);
+
+		return res.json(message);
+	} catch (err) {
+		return internalError(res, err, "POST /api/conversations/:id/messages/image");
 	}
 });
 

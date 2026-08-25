@@ -2,7 +2,7 @@
 
 // test
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { API_URL, apiFetch } from "@/lib/api";
 import { getAuth } from "@/lib/auth";
 import { ConversationList } from "@/components/ConversationList";
@@ -14,6 +14,8 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { AIMGaugeRing } from "@/components/AIMGaugeRing";
 import { riskGaugeColorClass } from "@/lib/aimDisplay";
 import { useAIMScore } from "@/lib/hooks/useAIMScore";
+import { validatePostImageFile } from "@/lib/postImage";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 type ReactionType = "confiable" | "not_reliable";
 
@@ -24,6 +26,7 @@ type Post = {
   userVerified: boolean;
   userProfilePictureUrl?: string | null;
   content: string;
+  imageUrl?: string | null;
   createdAt: string;
   reactions: { id: number; postId: number; userId: string; type: string }[];
   comments: {
@@ -95,6 +98,9 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [compose, setCompose] = useState("");
+  const [composeImage, setComposeImage] = useState<File | null>(null);
+  const [composeImagePreview, setComposeImagePreview] = useState<string | null>(null);
+  const [composeImageError, setComposeImageError] = useState<string | null>(null);
   const [openMessages, setOpenMessages] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
@@ -128,9 +134,33 @@ export default function HomePage() {
     return () => window.removeEventListener("vx-avatar-updated", onAvatarUpdated);
   }, [refreshMyAim]);
 
+  function handleComposeImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const validationError = validatePostImageFile(file);
+    if (validationError) {
+      setComposeImageError(validationError);
+      return;
+    }
+
+    setComposeImageError(null);
+    if (composeImagePreview) URL.revokeObjectURL(composeImagePreview);
+    setComposeImage(file);
+    setComposeImagePreview(URL.createObjectURL(file));
+  }
+
+  function clearComposeImage() {
+    if (composeImagePreview) URL.revokeObjectURL(composeImagePreview);
+    setComposeImage(null);
+    setComposeImagePreview(null);
+    setComposeImageError(null);
+  }
+
   async function submitPost() {
     const text = compose.trim();
-    if (!text) return;
+    if (!text && !composeImage) return;
 
     const auth = getAuth();
     if (!auth?.token) {
@@ -141,16 +171,28 @@ export default function HomePage() {
     try {
       setError(null);
 
-      const resp = await apiFetch(`${API_URL}/api/posts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }),
-      });
+      let resp: Response;
+      if (composeImage) {
+        const formData = new FormData();
+        formData.append("content", text);
+        formData.append("image", composeImage);
+        resp = await apiFetch(`${API_URL}/api/posts`, {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        resp = await apiFetch(`${API_URL}/api/posts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: text }),
+        });
+      }
 
       const data = await resp.json();
       if (!resp.ok) throw new Error(data?.error || "Failed to post");
 
       setCompose("");
+      clearComposeImage();
       await loadPosts();
     } catch (e: any) {
       setError(e?.message || "Failed to post");
@@ -219,6 +261,31 @@ export default function HomePage() {
     }
   }
 
+  async function deletePost(postId: number) {
+    const auth = getAuth();
+    if (!auth?.token) {
+      setError("Please login again");
+      return;
+    }
+
+    const snapshot = posts;
+    setPosts((current) => current.filter((p) => p.id !== postId));
+
+    try {
+      setError(null);
+      const resp = await apiFetch(`${API_URL}/api/posts/${postId}`, {
+        method: "DELETE",
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => null);
+        throw new Error(data?.error || "Failed to delete post");
+      }
+    } catch (e: any) {
+      setPosts(snapshot);
+      setError(e?.message || "Failed to delete post");
+    }
+  }
+
   return (
     <main
       className="vx-home-surface min-h-screen w-full min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
@@ -277,33 +344,102 @@ export default function HomePage() {
               />
             ) : null}
 
-            <div className="flex min-w-0 flex-1 flex-col gap-2 min-[420px]:flex-row min-[420px]:items-start min-[420px]:gap-2 sm:gap-3">
-              <textarea
-                value={compose}
-                onChange={(e) => setCompose(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void submitPost();
-                  }
-                }}
-                placeholder="What would you like to share today?"
-                className={cn(
-                  "flex-1 min-w-0 resize-none rounded-xl border bg-surface-subtle px-4 py-2.5 min-h-11 text-base sm:text-sm outline-none",
-                  "border-subtle focus:border-[var(--amber-border)] focus:bg-[var(--surface-input-focus)]",
-                  "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
-                  "transition-colors"
-                )}
-                rows={2}
-              />
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-start min-[420px]:gap-2 sm:gap-3">
+                <textarea
+                  value={compose}
+                  onChange={(e) => setCompose(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void submitPost();
+                    }
+                  }}
+                  placeholder="What would you like to share today?"
+                  className={cn(
+                    "flex-1 min-w-0 resize-none rounded-xl border bg-surface-subtle px-4 py-2.5 min-h-11 text-base sm:text-sm outline-none",
+                    "border-subtle focus:border-[var(--amber-border)] focus:bg-[var(--surface-input-focus)]",
+                    "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
+                    "transition-colors"
+                  )}
+                  rows={2}
+                />
 
-              <button
-                type="button"
-                onClick={submitPost}
-                className="vx-btn-primary vx-post-btn min-h-11 shrink-0 self-end rounded-xl px-4 text-sm font-semibold min-[420px]:self-auto sm:px-5 sm:text-base"
-              >
-                POST
-              </button>
+                <button
+                  type="button"
+                  onClick={submitPost}
+                  className="vx-btn-primary vx-post-btn min-h-11 shrink-0 self-end rounded-xl px-4 text-sm font-semibold min-[420px]:self-auto sm:px-5 sm:text-base"
+                >
+                  POST
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label
+                  className={cn(
+                    "inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm text-secondary",
+                    "border-subtle bg-surface-subtle transition-colors",
+                  )}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                  </svg>
+                  Photo
+                  <input
+                    type="file"
+                    accept={["image/jpeg", "image/png", "image/webp"].join(",")}
+                    className="sr-only"
+                    onChange={handleComposeImageChange}
+                  />
+                </label>
+
+                {composeImagePreview && (
+                  <div className="relative rounded-lg border border-[var(--divider)] bg-[var(--surface-subtle)] p-1">
+                    <img
+                      src={composeImagePreview}
+                      alt=""
+                      className="h-9 w-9 rounded-md object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearComposeImage}
+                      aria-label="Remove image"
+                      className="vx-feed-action absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-secondary"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        aria-hidden
+                      >
+                        <path d="M6 6l12 12M18 6L6 18" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+
+                {composeImageError && (
+                  <span className="text-xs text-red">{composeImageError}</span>
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -314,7 +450,7 @@ export default function HomePage() {
 
           {!loading &&
             posts.map((p) => (
-              <PostCard key={p.id} post={p} onReact={toggleReaction} onComment={addComment} />
+              <PostCard key={p.id} post={p} onReact={toggleReaction} onComment={addComment} onDelete={deletePost} />
             ))}
         </section>
       </div>
@@ -436,18 +572,34 @@ function PostCard({
   post,
   onReact,
   onComment,
+  onDelete,
 }: {
   post: Post;
   onReact: (id: number, t: ReactionType) => void;
   onComment: (id: number, text: string) => void;
+  onDelete: (id: number) => void;
 }) {
   const [showComments, setShowComments] = useState(false);
   const [text, setText] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const me = getAuth()?.user;
   const isOwnPost = Boolean(me?.id && me.id === post.userId);
   const reactions = post.reactions ?? [];
   const comments = post.comments ?? [];
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   const reliableCount = reactions.filter(
     (r) => r.type === "reliable" || r.type === "confiable"
@@ -485,7 +637,47 @@ function PostCard({
   }
 
   return (
-    <div className="vx-feed-card w-full min-w-0 rounded-2xl p-4 sm:p-5">
+    <div className="vx-feed-card relative w-full min-w-0 rounded-2xl p-4 sm:p-5">
+      {isOwnPost && (
+        <div ref={menuRef} className="absolute right-3 top-3 sm:right-4 sm:top-4">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Post options"
+            aria-expanded={menuOpen}
+            className="flex h-8 w-8 items-center justify-center text-secondary hover:text-primary transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden
+            >
+              <circle cx="12" cy="5" r="1.75" />
+              <circle cx="12" cy="12" r="1.75" />
+              <circle cx="12" cy="19" r="1.75" />
+            </svg>
+          </button>
+
+          {menuOpen && (
+            <div className="vx-panel absolute right-0 top-9 z-10 min-w-[8rem] overflow-hidden rounded-lg py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete(post.id);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-red hover-bg-surface"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-start gap-3">
         <Link href={`/profile/${post.userId}`} className="shrink-0" title={post.userName}>
           <UserAvatar
@@ -496,7 +688,7 @@ function PostCard({
           />
         </Link>
 
-        <div className="flex-1 min-w-0">
+        <div className={cn("flex-1 min-w-0", isOwnPost && "pr-8")}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
             <Link href={`/profile/${post.userId}`} className="font-semibold hover:underline truncate max-w-full">
               {post.userName}
@@ -511,112 +703,133 @@ function PostCard({
             <span className="text-tertiary">· {relTime(post.createdAt)}</span>
           </div>
 
-          <div className="mt-2 vx-body-sm text-primary whitespace-pre-wrap">
-            {post.content}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <button
-              type="button"
-              className="vx-feed-action min-h-11 px-3 py-2 rounded-lg text-secondary"
-              onClick={() => setShowComments((v) => !v)}
-            >
-              {comments.length > 0 ? "Answers" : "Reply"} {comments.length}
-            </button>
-
-            {!isOwnPost && (
-              <>
-                <button
-                  type="button"
-                  className={cn(
-                    "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
-                    reactedReliable
-                      ? "bg-[var(--amber)] text-[var(--text-on-amber)] border border-[var(--amber)]"
-                      : "vx-feed-action text-secondary"
-                  )}
-                  onClick={() => onReact(post.id, "confiable")}
-                >
-                  Reliable {reliableCount}
-                </button>
-
-                <button
-                  type="button"
-                  className={cn(
-                    "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
-                    reactedNotReliable
-                      ? "bg-[var(--red)] text-[var(--text-on-amber)] border border-[var(--red)]"
-                      : "vx-feed-action text-secondary"
-                  )}
-                  onClick={() => onReact(post.id, "not_reliable")}
-                >
-                  Not reliable {notReliableCount}
-                </button>
-              </>
-            )}
-          </div>
-
-          {showComments && (
-            <div className="mt-3 space-y-3">
-              <div className="space-y-2">
-                {comments.map((c) => (
-                  <div key={c.id} className="flex items-start gap-2">
-                    <Link href={`/profile/${c.userId}`} className="shrink-0" title={c.userName}>
-                      <UserAvatar
-                        userId={c.userId}
-                        name={c.userName}
-                        profilePictureUrl={c.userProfilePictureUrl}
-                        size="sm"
-                      />
-                    </Link>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm">
-                        <Link
-                          href={`/profile/${c.userId}`}
-                          className="font-medium hover:underline"
-                        >
-                          {c.userName}
-                        </Link>{" "}
-                        <span className="text-tertiary">· {relTime(c.createdAt)}</span>
-                      </div>
-
-                      <div className="vx-body-sm">{c.content}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center">
-                <input
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleCommentSubmit();
-                    }
-                  }}
-                  placeholder="Write a reply…"
-                  className={cn(
-                    "flex-1 min-w-0 rounded-xl border bg-surface-subtle px-3 py-2.5 min-h-11 text-base sm:text-sm outline-none",
-                    "border-subtle focus:border-[var(--amber-border)] focus:bg-[var(--surface-input-focus)]",
-                    "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
-                    "transition-colors"
-                  )}
-                />
-
-                <button
-                  type="button"
-                  onClick={handleCommentSubmit}
-                  className="vx-btn-primary min-h-11 shrink-0 self-end rounded-xl px-4 text-sm font-semibold min-[400px]:self-auto"
-                >
-                  Reply
-                </button>
-              </div>
+          {post.content && (
+            <div className="mt-2 vx-body-sm text-primary whitespace-pre-wrap">
+              {post.content}
             </div>
           )}
         </div>
       </div>
+
+      {post.imageUrl && (
+        <button
+          type="button"
+          onClick={() => setLightboxOpen(true)}
+          className="mt-3 block w-full overflow-hidden rounded-xl border border-[var(--divider)] cursor-pointer"
+        >
+          <img
+            src={post.imageUrl}
+            alt=""
+            className="max-h-[480px] w-full object-cover"
+            loading="lazy"
+          />
+        </button>
+      )}
+
+      {lightboxOpen && post.imageUrl && (
+        <ImageLightbox src={post.imageUrl} onClose={() => setLightboxOpen(false)} />
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <button
+          type="button"
+          className="vx-feed-action min-h-11 px-3 py-2 rounded-lg text-secondary"
+          onClick={() => setShowComments((v) => !v)}
+        >
+          {comments.length > 0 ? "Answers" : "Reply"} {comments.length}
+        </button>
+
+        {!isOwnPost && (
+          <>
+            <button
+              type="button"
+              className={cn(
+                "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
+                reactedReliable
+                  ? "bg-[var(--amber)] text-[var(--text-on-amber)] border border-[var(--amber)]"
+                  : "vx-feed-action text-secondary"
+              )}
+              onClick={() => onReact(post.id, "confiable")}
+            >
+              Reliable {reliableCount}
+            </button>
+
+            <button
+              type="button"
+              className={cn(
+                "min-h-11 px-3 py-2 rounded-lg text-sm transition-colors",
+                reactedNotReliable
+                  ? "bg-[var(--red)] text-[var(--text-on-amber)] border border-[var(--red)]"
+                  : "vx-feed-action text-secondary"
+              )}
+              onClick={() => onReact(post.id, "not_reliable")}
+            >
+              Not reliable {notReliableCount}
+            </button>
+          </>
+        )}
+      </div>
+
+      {showComments && (
+        <div className="mt-3 space-y-3">
+          <div className="space-y-2">
+            {comments.map((c) => (
+              <div key={c.id} className="flex items-start gap-2">
+                <Link href={`/profile/${c.userId}`} className="shrink-0" title={c.userName}>
+                  <UserAvatar
+                    userId={c.userId}
+                    name={c.userName}
+                    profilePictureUrl={c.userProfilePictureUrl}
+                    size="sm"
+                  />
+                </Link>
+
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm">
+                    <Link
+                      href={`/profile/${c.userId}`}
+                      className="font-medium hover:underline"
+                    >
+                      {c.userName}
+                    </Link>{" "}
+                    <span className="text-tertiary">· {relTime(c.createdAt)}</span>
+                  </div>
+
+                  <div className="vx-body-sm">{c.content}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleCommentSubmit();
+                }
+              }}
+              placeholder="Write a reply…"
+              className={cn(
+                "flex-1 min-w-0 rounded-xl border bg-surface-subtle px-3 py-2.5 min-h-11 text-base sm:text-sm outline-none",
+                "border-subtle focus:border-[var(--amber-border)] focus:bg-[var(--surface-input-focus)]",
+                "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
+                "transition-colors"
+              )}
+            />
+
+            <button
+              type="button"
+              onClick={handleCommentSubmit}
+              className="vx-btn-primary min-h-11 shrink-0 self-end rounded-xl px-4 text-sm font-semibold min-[400px]:self-auto"
+            >
+              Reply
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -42,6 +42,8 @@ import { processPendingEvents } from "./lib/eventProcessor";
 
 import { globalErrorHandler } from "./middleware/errorHandler";
 
+import { setIO } from "./lib/socket";
+
 
 
 const app = express();
@@ -107,6 +109,8 @@ const io = new Server(httpServer, {
   cors: { origin: FRONTEND_URL, credentials: true }
 
 });
+
+setIO(io);
 
 
 

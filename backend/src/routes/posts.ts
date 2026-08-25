@@ -1,4 +1,7 @@
 import { Router } from "express";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { Readable } from "stream";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
@@ -6,6 +9,70 @@ import { recordPeerFeedback } from "../lib/aimV2";
 import { onPostCreated, onPostDeleted } from "../lib/domainScoreService";
 import { processPendingEvents } from "../lib/eventProcessor";
 import { zContent, invalidPayload, internalError } from "../lib/validation";
+
+const ALLOWED_POST_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_POST_IMAGE_SIZE = 8 * 1024 * 1024;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const postImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_POST_IMAGE_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_POST_IMAGE_MIME.has(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error("Invalid file type"));
+  },
+});
+
+function uploadPostImageToCloudinary(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "veraxius/posts",
+        transformation: { width: 1600, height: 1600, crop: "limit" },
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        if (!result?.secure_url) {
+          reject(new Error("Upload failed"));
+          return;
+        }
+        resolve(result.secure_url);
+      },
+    );
+
+    Readable.from(buffer).pipe(uploadStream);
+  });
+}
+
+function handlePostImageUpload(
+  req: import("express").Request,
+  res: import("express").Response,
+  next: import("express").NextFunction,
+) {
+  postImageUpload.single("image")(req, res, (err: unknown) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ error: "Image too large" });
+      }
+      return res.status(400).json({ error: "Upload failed" });
+    }
+    if (err) {
+      return res.status(400).json({ error: "Invalid file type" });
+    }
+    return next();
+  });
+}
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AIMCFG = require("../../aim.config.js");
@@ -29,7 +96,7 @@ async function bumpAuthorAimScore(authorUserId: string, delta: number) {
 const router = Router();
 
 const CreatePostSchema = z.object({
-  content: zContent,
+  content: z.string().max(10_000),
 });
 
 const ReactSchema = z.object({
@@ -99,13 +166,27 @@ router.get("/", async (_req, res) => {
   }
 });
 
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, handlePostImageUpload, async (req, res) => {
   try {
     const parsed = CreatePostSchema.safeParse(req.body);
     if (!parsed.success) return invalidPayload(res);
 
     const userId = req.userId as string;
     const content = parsed.data.content.trim();
+
+    if (!content && !req.file) return invalidPayload(res);
+
+    let imageUrl: string | null = null;
+    if (req.file) {
+      if (
+        !process.env.CLOUDINARY_CLOUD_NAME ||
+        !process.env.CLOUDINARY_API_KEY ||
+        !process.env.CLOUDINARY_API_SECRET
+      ) {
+        return res.status(500).json({ error: "Upload service not configured" });
+      }
+      imageUrl = await uploadPostImageToCloudinary(req.file.buffer);
+    }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     const userName = user?.name ?? user?.email?.split("@")[0] ?? "user";
@@ -116,6 +197,7 @@ router.post("/", requireAuth, async (req, res) => {
         userName,
         userVerified: false,
         content,
+        imageUrl,
       },
     });
 

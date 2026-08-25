@@ -62,6 +62,7 @@ model ConversationParticipant {
 model Message {
   id             String       @id @default(cuid())
   content        String
+  imageUrl       String?
   status         String       @default("sent") // sent | delivered | read
   created_at     DateTime     @default(now())
   conversationId String
@@ -174,6 +175,7 @@ model Post {
   userName     String
   userVerified Boolean        @default(false)
   content      String
+  imageUrl     String?
   createdAt    DateTime       @default(now())
   reactions    PostReaction[]
   comments     Comment[]
