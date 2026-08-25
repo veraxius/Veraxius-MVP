@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Syne, DM_Sans, DM_Mono } from "next/font/google";
+import Script from "next/script";
 import { NavBar } from "@/components/NavBar";
 import { SessionSync } from "@/components/SessionSync";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -45,6 +46,20 @@ export default function RootLayout({
     <html lang="en" className={`${syne.variable} ${dmSans.variable} ${dmMono.variable}`} suppressHydrationWarning>
       <head>
         <ThemeScript />
+        {/* Google tag (gtag.js) */}
+        <Script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=G-7WC0W45L36"
+          strategy="afterInteractive"
+        />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-7WC0W45L36');
+          `}
+        </Script>
       </head>
       <body className="overflow-x-hidden min-h-screen min-w-0">
         <ThemeProvider>
