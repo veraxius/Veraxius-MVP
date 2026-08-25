@@ -154,7 +154,7 @@ export function IntegrityStackSection() {
                         color: "var(--text-primary)",
                         transition: "text-shadow 0.3s ease",
                         textShadow: hoveredIndex === 2 && index === 2
-                          ? "0 0 24px rgba(255,255,255,0.32)"
+                          ? "0 0 24px rgba(29,29,31,0.32)"
                           : "none",
                       }}
                     >

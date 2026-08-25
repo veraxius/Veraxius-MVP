@@ -51,7 +51,7 @@ export function AIMGaugeRing({
 					cx={center}
 					cy={center}
 					r={radius}
-					stroke="var(--bg-panel)"
+					stroke="var(--divider)"
 					strokeWidth={stroke}
 					fill="none"
 				/>

@@ -82,7 +82,7 @@ export function SystemPreviewSection() {
               className="absolute top-0 left-0 right-0 h-0.5"
               style={{
                 background: isBefore
-                  ? "linear-gradient(90deg, rgba(255,255,255,0.1) 0%, transparent 100%)"
+                  ? "linear-gradient(90deg, rgba(29,29,31,0.1) 0%, transparent 100%)"
                   : "linear-gradient(90deg, var(--amber) 0%, var(--amber-glow) 50%, transparent 100%)",
                 transition: "background 0.3s ease",
               }}
@@ -286,7 +286,7 @@ export function SystemPreviewSection() {
               className="mt-5 flex items-center justify-between px-3 py-2.5"
               style={{
                 background: isBefore ? "transparent" : "rgba(255,185,0,0.04)",
-                borderLeft: isBefore ? "2px solid rgba(255,255,255,0.08)" : "2px solid rgba(255,185,0,0.35)",
+                borderLeft: isBefore ? "2px solid rgba(29,29,31,0.08)" : "2px solid rgba(255,185,0,0.35)",
                 transition: "all 0.3s ease",
               }}
             >
@@ -324,7 +324,7 @@ export function SystemPreviewSection() {
                 style={{
                   letterSpacing: "0.16em",
                   color: isBefore ? "var(--text-disabled)" : "var(--green)",
-                  border: isBefore ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,200,100,0.3)",
+                  border: isBefore ? "1px solid rgba(29,29,31,0.08)" : "1px solid rgba(0,200,100,0.3)",
                   background: isBefore ? "transparent" : "rgba(0,200,100,0.06)",
                   borderRadius: "2px",
                   transition: "all 0.3s ease",
@@ -421,7 +421,7 @@ export function SystemPreviewSection() {
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = "var(--amber-border)";
                 e.currentTarget.style.color = "var(--text-primary)";
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.03)";
+                e.currentTarget.style.backgroundColor = "rgba(29, 29, 31, 0.03)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = "var(--divider)";

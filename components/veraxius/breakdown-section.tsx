@@ -393,47 +393,52 @@ export function BreakdownSection() {
                 }}
               />
 
-              {/* Header */}
-              <div className="grid grid-cols-3 gap-4 items-end">
-                <div></div>
-                <div
-                  className="text-center font-dm-mono text-[11px] uppercase pb-2"
-                  style={{
-                    letterSpacing: "0.12em",
-                    color: "var(--red)",
-                    borderBottom: "2px solid var(--red)",
-                  }}
-                >
-                  Without Veraxius
-                </div>
-                <div
-                  className="text-center font-dm-mono text-[11px] uppercase pb-2"
-                  style={{
-                    letterSpacing: "0.12em",
-                    color: "var(--amber)",
-                    borderBottom: "2px solid var(--amber)",
-                  }}
-                >
-                  With Veraxius
-                </div>
-              </div>
+              {/* Header + Rows — horizontal scroll on narrow viewports so the 3-col comparison never squishes */}
+              <div className="overflow-x-auto">
+                <div className="min-w-[420px]">
+                  {/* Header */}
+                  <div className="grid grid-cols-3 gap-4 items-end">
+                    <div></div>
+                    <div
+                      className="text-center font-dm-mono text-[11px] uppercase pb-2"
+                      style={{
+                        letterSpacing: "0.12em",
+                        color: "var(--red)",
+                        borderBottom: "2px solid var(--red)",
+                      }}
+                    >
+                      Without Veraxius
+                    </div>
+                    <div
+                      className="text-center font-dm-mono text-[11px] uppercase pb-2"
+                      style={{
+                        letterSpacing: "0.12em",
+                        color: "var(--amber)",
+                        borderBottom: "2px solid var(--amber)",
+                      }}
+                    >
+                      With Veraxius
+                    </div>
+                  </div>
 
-              {/* Rows */}
-              <div className="mt-6 divide-y" style={{ borderColor: "var(--divider)" }}>
-                <div className="grid grid-cols-3 gap-4 py-4">
-                  <div className="font-dm-sans" style={{ color: "var(--text-secondary)", fontSize: "16px" }}>Signal confidence</div>
-                  <div className="text-center font-dm-sans" style={{ color: "var(--red)", fontSize: "16px" }}>Low</div>
-                  <div className="text-center font-dm-sans" style={{ color: "var(--amber)", fontSize: "16px" }}>High</div>
-                </div>
-                <div className="grid grid-cols-3 gap-4 py-4">
-                  <div className="font-dm-sans" style={{ color: "var(--text-secondary)", fontSize: "16px" }}>Claim validation</div>
-                  <div className="text-center font-dm-sans" style={{ color: "var(--red)", fontSize: "16px" }}>Manual</div>
-                  <div className="text-center font-dm-sans" style={{ color: "var(--amber)", fontSize: "16px" }}>Automated</div>
-                </div>
-                <div className="grid grid-cols-3 gap-4 py-4">
-                  <div className="font-dm-sans" style={{ color: "var(--text-secondary)", fontSize: "16px" }}>Decision risk</div>
-                  <div className="text-center font-dm-sans" style={{ color: "var(--red)", fontSize: "16px" }}>High</div>
-                  <div className="text-center font-dm-sans" style={{ color: "var(--amber)", fontSize: "16px" }}>Reduced</div>
+                  {/* Rows */}
+                  <div className="mt-6 divide-y" style={{ borderColor: "var(--divider)" }}>
+                    <div className="grid grid-cols-3 gap-4 py-4">
+                      <div className="font-dm-sans" style={{ color: "var(--text-secondary)", fontSize: "16px" }}>Signal confidence</div>
+                      <div className="text-center font-dm-sans" style={{ color: "var(--red)", fontSize: "16px" }}>Low</div>
+                      <div className="text-center font-dm-sans" style={{ color: "var(--amber)", fontSize: "16px" }}>High</div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 py-4">
+                      <div className="font-dm-sans" style={{ color: "var(--text-secondary)", fontSize: "16px" }}>Claim validation</div>
+                      <div className="text-center font-dm-sans" style={{ color: "var(--red)", fontSize: "16px" }}>Manual</div>
+                      <div className="text-center font-dm-sans" style={{ color: "var(--amber)", fontSize: "16px" }}>Automated</div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 py-4">
+                      <div className="font-dm-sans" style={{ color: "var(--text-secondary)", fontSize: "16px" }}>Decision risk</div>
+                      <div className="text-center font-dm-sans" style={{ color: "var(--red)", fontSize: "16px" }}>High</div>
+                      <div className="text-center font-dm-sans" style={{ color: "var(--amber)", fontSize: "16px" }}>Reduced</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>

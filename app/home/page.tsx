@@ -421,7 +421,7 @@ function TrustFeatureMiniCards() {
           className={cn(
             "flex items-center justify-center gap-2 rounded-xl border border-[var(--divider)]",
             "bg-[var(--surface-subtle)] px-2.5 py-2.5 sm:px-3 sm:py-3",
-            "text-[11px] sm:text-xs font-medium text-[var(--text-secondary)] text-center min-w-0",
+            "text-[11px] sm:text-xs font-medium text-[var(--text-secondary-strong)] text-center min-w-0",
           )}
         >
           <TrustFeatureIcon type={card.icon} />

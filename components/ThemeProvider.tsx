@@ -1,7 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { applyTheme, getStoredTheme, THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+	applyTheme,
+	getStoredTheme,
+	getSystemTheme,
+	hasStoredTheme,
+	setStoredTheme,
+	type Theme,
+} from "@/lib/theme";
 
 type ThemeContextValue = {
 	theme: Theme;
@@ -11,25 +18,46 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-	const [theme, setTheme] = useState<Theme>("dark");
+	const [theme, setTheme] = useState<Theme>("light");
+	const hasManualChoice = useRef(false);
 
 	useEffect(() => {
 		const stored = getStoredTheme();
 		setTheme(stored);
 		applyTheme(stored);
+		hasManualChoice.current = hasStoredTheme();
 	}, []);
 
 	useEffect(() => {
 		applyTheme(theme);
-		try {
-			localStorage.setItem(THEME_STORAGE_KEY, theme);
-		} catch {
-			// ignore
-		}
 	}, [theme]);
 
+	// Keep following the OS/browser color-scheme (and time of day) live,
+	// unless the person has explicitly picked a theme with the toggle.
+	useEffect(() => {
+		function syncFromSystem() {
+			if (hasManualChoice.current) return;
+			setTheme(getSystemTheme());
+		}
+		let mediaQuery: MediaQueryList | undefined;
+		if (typeof window !== "undefined" && window.matchMedia) {
+			mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+			mediaQuery.addEventListener("change", syncFromSystem);
+		}
+		const interval = setInterval(syncFromSystem, 15 * 60 * 1000);
+		return () => {
+			mediaQuery?.removeEventListener("change", syncFromSystem);
+			clearInterval(interval);
+		};
+	}, []);
+
 	const toggleTheme = useCallback(() => {
-		setTheme((current) => (current === "dark" ? "light" : "dark"));
+		setTheme((current) => {
+			const next = current === "dark" ? "light" : "dark";
+			hasManualChoice.current = true;
+			setStoredTheme(next);
+			return next;
+		});
 	}, []);
 
 	return (

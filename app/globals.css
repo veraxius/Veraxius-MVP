@@ -3,17 +3,19 @@
 @tailwind utilities;
 
 :root {
-  /* Color System - Exact from prompt (dark mode — default) */
-  --bg-primary: #0A0A0B;
-  --bg-secondary: #131417;
-  --bg-panel: #101114;
-  --bg-header: rgba(10, 10, 11, 0.88);
-  --text-primary: #F5F7FA;
-  --text-secondary: rgba(245, 247, 250, 0.72);
-  --text-tertiary: rgba(245, 247, 250, 0.48);
-  --text-disabled: rgba(245, 247, 250, 0.28);
+  /* Color System — Apple.com-inspired neutral palette (default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-panel: #ffffff;
+  --bg-panel-glass: rgba(255, 255, 255, 0.55);
+  --bg-header: rgba(255, 255, 255, 0.65);
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-secondary-strong: #6e6e73;
+  --text-tertiary: rgba(29, 29, 31, 0.56);
+  --text-disabled: rgba(29, 29, 31, 0.32);
   --text-on-amber: #0A0A0B;
-  --steel: #6C727F;
+  --steel: #86868b;
   --amber: #FFB84D;
   --amber-glow: #FFC978;
   --amber-border: rgba(255, 184, 77, 0.24);
@@ -22,38 +24,47 @@
   --red: #FF6B57;
   --red-transparent: rgba(255, 107, 87, 0.6);
   --blue: #4DA3FF;
-  --divider: rgba(255, 255, 255, 0.08);
-  --divider-strong: rgba(255, 255, 255, 0.12);
-  --grid-line: rgba(255, 255, 255, 0.04);
-  --surface-hover: rgba(255, 255, 255, 0.05);
-  --surface-active: rgba(255, 255, 255, 0.1);
-  --surface-input: rgba(255, 255, 255, 0.03);
-  --surface-input-focus: rgba(255, 255, 255, 0.04);
-  --border-subtle: rgba(255, 255, 255, 0.1);
+  --divider: #d2d2d7;
+  --divider-strong: #c4c4c9;
+  --grid-line: rgba(29, 29, 31, 0.04);
+  --surface-hover: rgba(29, 29, 31, 0.035);
+  --surface-active: rgba(29, 29, 31, 0.06);
+  --surface-input: rgba(29, 29, 31, 0.03);
+  --surface-input-focus: rgba(29, 29, 31, 0.045);
+  --border-subtle: #d2d2d7;
   --overlay-scrim: rgba(0, 0, 0, 0.3);
-  --noise-opacity: 0.035;
+  --noise-opacity: 0;
 }
 
-[data-theme="light"] {
-  --bg-primary: #E4E6EA;
-  --bg-secondary: #D8DBE0;
-  --bg-panel: #ECEEF2;
-  --bg-header: rgba(236, 238, 242, 0.92);
-  --text-primary: #0D0E10;
-  --text-secondary: rgba(13, 14, 16, 0.72);
-  --text-tertiary: rgba(13, 14, 16, 0.48);
-  --text-disabled: rgba(13, 14, 16, 0.28);
+/* Dark mode — Apple-style dark gray (never pure black), same minimalist/glass language */
+[data-theme="dark"] {
+  --bg-primary: #131316;
+  --bg-secondary: #1c1c1e;
+  --bg-panel: #202024;
+  --bg-panel-glass: rgba(255, 255, 255, 0.06);
+  --bg-header: rgba(19, 19, 22, 0.72);
+  --text-primary: #f5f5f7;
+  --text-secondary: #98989d;
+  --text-secondary-strong: #c7c7cc;
+  --text-tertiary: rgba(245, 245, 247, 0.52);
+  --text-disabled: rgba(245, 245, 247, 0.28);
   --text-on-amber: #0A0A0B;
-  --divider: rgba(0, 0, 0, 0.08);
-  --divider-strong: rgba(0, 0, 0, 0.12);
-  --grid-line: rgba(0, 0, 0, 0.04);
-  --surface-hover: rgba(0, 0, 0, 0.04);
-  --surface-active: rgba(0, 0, 0, 0.06);
-  --surface-input: rgba(0, 0, 0, 0.03);
-  --surface-input-focus: rgba(0, 0, 0, 0.05);
-  --border-subtle: rgba(0, 0, 0, 0.1);
-  --overlay-scrim: rgba(0, 0, 0, 0.25);
-  --noise-opacity: 0.028;
+  --steel: #98989d;
+  --divider: rgba(255, 255, 255, 0.14);
+  --divider-strong: rgba(255, 255, 255, 0.2);
+  --grid-line: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --surface-active: rgba(255, 255, 255, 0.1);
+  --surface-input: rgba(255, 255, 255, 0.05);
+  --surface-input-focus: rgba(255, 255, 255, 0.07);
+  --border-subtle: rgba(255, 255, 255, 0.14);
+  --overlay-scrim: rgba(0, 0, 0, 0.5);
+  --noise-opacity: 0;
+}
+
+/* Apple-style sans-serif stack, used by headings/body typography classes below */
+:root {
+  --font-apple: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 html {
@@ -63,6 +74,7 @@ html {
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  font-family: var(--font-apple);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   position: relative;
@@ -124,29 +136,31 @@ body::before {
     background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   }
 
-  /* Panel styles */
+  /* Panel styles — liquid glass, Apple-style */
   .vx-panel {
-    background-color: var(--bg-panel);
+    background-color: var(--bg-panel-glass);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
     border: 1px solid var(--divider);
   }
 
-  /* Home feed — vintage texture on background only */
+  /* Home feed — soft Apple-style frosted mesh background */
   .vx-home-surface {
-    background:
-      radial-gradient(ellipse 90% 60% at 50% -10%, rgba(255, 184, 77, 0.05) 0%, transparent 55%),
-      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(255, 107, 87, 0.03) 0%, transparent 50%),
-      var(--bg-primary);
+    background: var(--bg-secondary);
     isolation: isolate;
   }
 
   .vx-home-surface::before {
     content: '';
     position: fixed;
-    inset: 0;
+    inset: -10%;
     pointer-events: none;
     z-index: 0;
-    opacity: 0.055;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background:
+      radial-gradient(ellipse 50% 40% at 15% 0%, rgba(255, 184, 77, 0.14) 0%, transparent 60%),
+      radial-gradient(ellipse 45% 35% at 85% 15%, rgba(77, 163, 255, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 45% at 50% 100%, rgba(255, 107, 87, 0.06) 0%, transparent 60%);
+    filter: blur(60px);
   }
 
   .vx-home-surface > * {
@@ -154,41 +168,89 @@ body::before {
     z-index: 1;
   }
 
-  /* Home feed cards — clean glass panels above vintage bg */
+  [data-theme="dark"] .vx-home-surface::before {
+    background:
+      radial-gradient(ellipse 50% 40% at 15% 0%, rgba(255, 184, 77, 0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 45% 35% at 85% 15%, rgba(77, 163, 255, 0.14) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 45% at 50% 100%, rgba(255, 107, 87, 0.1) 0%, transparent 60%);
+  }
+
+  /* Auth card (login / register / forgot-password) — subtle amber border on hover */
+  .vx-auth-card {
+    transition: border-color 0.2s ease;
+  }
+
+  .vx-auth-card:hover {
+    border-color: rgba(255, 184, 77, 0.18);
+  }
+
+  /* Home feed cards — liquid glass, Apple-style */
   .vx-feed-card {
     background: linear-gradient(
       165deg,
-      rgba(22, 23, 27, 0.92) 0%,
-      rgba(16, 17, 20, 0.88) 100%
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.32) 100%
     );
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.06) inset,
-      0 1px 2px rgba(0, 0, 0, 0.2),
-      0 12px 40px rgba(0, 0, 0, 0.28);
+      0 1px 0 rgba(255, 255, 255, 0.7) inset,
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 12px 40px rgba(0, 0, 0, 0.08);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .vx-feed-card:hover {
-    border-color: rgba(255, 184, 77, 0.18);
+    border-color: rgba(255, 184, 77, 0.4);
     box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.08) inset,
-      0 1px 2px rgba(0, 0, 0, 0.2),
-      0 16px 48px rgba(0, 0, 0, 0.32),
-      0 0 0 1px rgba(255, 184, 77, 0.06);
+      0 1px 0 rgba(255, 255, 255, 0.8) inset,
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 16px 48px rgba(0, 0, 0, 0.1),
+      0 0 0 1px rgba(255, 184, 77, 0.1);
   }
 
   .vx-feed-action {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     transition: background-color 0.15s ease, border-color 0.15s ease;
   }
 
   .vx-feed-action:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.7);
+  }
+
+  [data-theme="dark"] .vx-feed-card {
+    background: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    border: 1px solid var(--divider);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.05) inset,
+      0 1px 2px rgba(0, 0, 0, 0.2),
+      0 12px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  [data-theme="dark"] .vx-feed-card:hover {
+    border-color: rgba(255, 184, 77, 0.3);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.07) inset,
+      0 1px 2px rgba(0, 0, 0, 0.22),
+      0 16px 48px rgba(0, 0, 0, 0.34),
+      0 0 0 1px rgba(255, 184, 77, 0.1);
+  }
+
+  [data-theme="dark"] .vx-feed-action {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  [data-theme="dark"] .vx-feed-action:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
 
   /* Subtle amber neon — shared by navbar AIM + home brand label */
@@ -212,49 +274,6 @@ body::before {
     box-shadow:
       0 0 5px rgba(255, 201, 120, 0.28),
       0 0 12px rgba(255, 184, 77, 0.12);
-  }
-
-  [data-theme="light"] .vx-home-surface {
-    background:
-      radial-gradient(ellipse 90% 60% at 50% -10%, rgba(255, 184, 77, 0.1) 0%, transparent 55%),
-      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(255, 107, 87, 0.06) 0%, transparent 50%),
-      var(--bg-primary);
-  }
-
-  [data-theme="light"] .vx-home-surface::before {
-    opacity: 0.04;
-  }
-
-  [data-theme="light"] .vx-feed-card {
-    background: linear-gradient(
-      165deg,
-      rgba(240, 242, 245, 0.98) 0%,
-      rgba(232, 235, 239, 0.94) 100%
-    );
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.5) inset,
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 12px 40px rgba(0, 0, 0, 0.07);
-  }
-
-  [data-theme="light"] .vx-feed-card:hover {
-    border-color: rgba(255, 184, 77, 0.35);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.65) inset,
-      0 1px 2px rgba(0, 0, 0, 0.06),
-      0 16px 48px rgba(0, 0, 0, 0.09),
-      0 0 0 1px rgba(255, 184, 77, 0.12);
-  }
-
-  [data-theme="light"] .vx-feed-action {
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    background: rgba(0, 0, 0, 0.03);
-  }
-
-  [data-theme="light"] .vx-feed-action:hover {
-    background: rgba(0, 0, 0, 0.05);
-    border-color: rgba(0, 0, 0, 0.12);
   }
 
   /* Typography classes */
@@ -281,41 +300,41 @@ body::before {
   }
 
   .vx-h1 {
-    font-family: var(--font-syne), sans-serif;
-    font-weight: 800;
+    font-family: var(--font-apple);
+    font-weight: 600;
     font-size: clamp(44px, 6vw, 80px);
     line-height: 1.05;
-    letter-spacing: -0.02em;
+    letter-spacing: 0.01em;
     color: var(--text-primary);
   }
 
   .vx-h2 {
-    font-family: var(--font-syne), sans-serif;
-    font-weight: 800;
+    font-family: var(--font-apple);
+    font-weight: 600;
     font-size: clamp(32px, 4vw, 52px);
     line-height: 1.1;
-    letter-spacing: -0.01em;
+    letter-spacing: 0.005em;
     color: var(--text-primary);
   }
 
   .vx-h3 {
-    font-family: var(--font-syne), sans-serif;
-    font-weight: 700;
+    font-family: var(--font-apple);
+    font-weight: 600;
     font-size: clamp(28px, 3.5vw, 44px);
     line-height: 1.15;
     color: var(--text-primary);
   }
 
   .vx-h4 {
-    font-family: var(--font-syne), sans-serif;
-    font-weight: 600;
+    font-family: var(--font-apple);
+    font-weight: 500;
     font-size: clamp(18px, 2.5vw, 28px);
     line-height: 1.2;
     color: var(--text-primary);
   }
 
   .vx-body {
-    font-family: var(--font-dm-sans), sans-serif;
+    font-family: var(--font-apple);
     font-weight: 400;
     font-size: 19px;
     line-height: 1.65;
@@ -323,7 +342,7 @@ body::before {
   }
 
   .vx-body-sm {
-    font-family: var(--font-dm-sans), sans-serif;
+    font-family: var(--font-apple);
     font-weight: 400;
     font-size: 17px;
     line-height: 1.6;
@@ -399,11 +418,17 @@ body::before {
   /* Grid background for hero */
   .vx-grid-bg {
     background-image:
-      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      linear-gradient(rgba(29, 29, 31, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(29, 29, 31, 0.05) 1px, transparent 1px);
     background-size: 60px 60px;
     -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
     mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  }
+
+  [data-theme="dark"] .vx-grid-bg {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   }
 
   /* Amber radial glow */
@@ -418,7 +443,7 @@ body::before {
   .vx-list-item {
     position: relative;
     padding-left: 24px;
-    font-family: var(--font-dm-sans), sans-serif;
+    font-family: var(--font-apple);
     font-size: 17px;
     line-height: 1.7;
     color: var(--text-secondary);
@@ -454,7 +479,7 @@ body::before {
   .vx-blockquote-strong {
     border-left: 3px solid var(--amber);
     padding-left: 20px;
-    font-family: var(--font-syne), sans-serif;
+    font-family: var(--font-apple);
     font-weight: 600;
     font-size: 20px;
     line-height: 1.5;

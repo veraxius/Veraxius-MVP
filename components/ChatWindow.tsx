@@ -367,7 +367,14 @@ export function ChatWindow({ conversationId, targetUserId, targetEmail, targetNa
 									: "border border-[var(--divider)] text-[var(--text-primary)]"
 							)}
 						>
-							<p className="vx-body-sm">{m.content}</p>
+							<p
+								className={cn(
+									"vx-body-sm",
+									m.senderId === meId ? "!text-[var(--text-on-amber)]" : "!text-[var(--text-primary)]"
+								)}
+							>
+								{m.content}
+							</p>
 							<p
 								className={cn(
 									"vx-mono-sm mt-1",

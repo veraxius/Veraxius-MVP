@@ -150,7 +150,7 @@ export function HeroSection() {
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = "var(--amber-border)";
                 e.currentTarget.style.color = "var(--text-primary)";
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.03)";
+                e.currentTarget.style.backgroundColor = "rgba(29, 29, 31, 0.03)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = "var(--divider)";

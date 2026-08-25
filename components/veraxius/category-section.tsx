@@ -47,7 +47,7 @@ export function CategorySection() {
               color: "var(--text-primary)",
             }}
           >
-            <span style={{ textShadow: "0 0 40px rgba(255,255,255,0.08)" }}>Integrity</span>{" "}
+            <span style={{ textShadow: "0 0 40px rgba(29,29,31,0.08)" }}>Integrity</span>{" "}
             <span style={{ color: "var(--amber)", textShadow: "0 0 30px rgba(255,185,0,0.3)" }}>Infrastructure.</span>
           </motion.h2>
 

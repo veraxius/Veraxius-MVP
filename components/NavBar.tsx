@@ -49,7 +49,7 @@ export function NavBar() {
 		};
 	}, [pathname]);
 
-	if (pathname === "/login" || pathname === "/register") return null;
+	if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") return null;
 
 	const isHome = pathname === "/home" || pathname === "/";
 	const isMessages = pathname === "/messages";
@@ -66,8 +66,8 @@ export function NavBar() {
 
 	return (
 		<header
-			className="w-full sticky top-0 z-40"
-			style={{ backgroundColor: "var(--bg-panel)", borderBottom: "0.1px solid var(--amber)" }}
+			className="w-full sticky top-0 z-40 backdrop-blur-xl backdrop-saturate-150"
+			style={{ backgroundColor: "var(--bg-header)", borderBottom: "1px solid var(--divider)" }}
 		>
 			<div className="w-full max-w-[100vw] px-3 sm:px-6 lg:px-8 overflow-x-clip">
 				<div
@@ -91,8 +91,8 @@ export function NavBar() {
 							href="/profile"
 							className={cn(
 								"justify-self-center z-[5] inline-flex items-center rounded-full",
-								"px-1.5 py-1 sm:px-2.5 sm:py-1.5 min-h-8 sm:min-h-11",
-								"border border-[var(--divider)] text-[10px] sm:text-xs text-[var(--text-secondary)]",
+								"px-2 py-1 sm:px-3 sm:py-1.5 min-h-8 sm:min-h-11",
+								"border border-[var(--divider-strong)] bg-[var(--surface-active)] text-[11px] sm:text-sm text-[var(--text-secondary)]",
 								"min-w-0 max-w-full",
 							)}
 							title="View AIM profile"

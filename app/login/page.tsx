@@ -154,8 +154,8 @@ export default function LoginPage() {
       />
 
       <main
-        className="relative min-h-screen w-full min-w-0 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
-        style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}
+        className="vx-home-surface relative min-h-screen w-full min-w-0 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
+        style={{ color: "var(--text-primary)" }}
       >
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
           <ThemeToggle />
@@ -164,7 +164,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-center mb-6">
             <VeraxiusLogo variant="login" priority />
           </div>
-          <div className="rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-5 sm:p-8 shadow-xl">
+          <div className="vx-auth-card rounded-2xl border border-[var(--divider)] bg-[var(--bg-panel)] p-5 sm:p-8 shadow-xl">
             <div className="mb-8 text-center">
               <h1 className="vx-h3">Sign in</h1>
               <p className="vx-body-sm mt-2 text-center">Access your account</p>
