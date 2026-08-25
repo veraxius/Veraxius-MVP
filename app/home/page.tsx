@@ -365,20 +365,55 @@ export default function HomePage() {
                   rows={2}
                 />
 
-                <button
-                  type="button"
-                  onClick={submitPost}
-                  className="vx-btn-primary vx-post-btn min-h-11 shrink-0 self-end rounded-xl px-4 text-sm font-semibold min-[420px]:self-auto sm:px-5 sm:text-base"
-                >
-                  POST
-                </button>
+                <div className="flex shrink-0 items-center gap-2 self-end min-[420px]:self-auto">
+                  <label
+                    className={cn(
+                      "flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-xl border text-secondary",
+                      "border-subtle bg-surface-subtle transition-colors",
+                      "min-[420px]:hidden",
+                    )}
+                    aria-label="Add photo"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
+                    <input
+                      type="file"
+                      accept={["image/jpeg", "image/png", "image/webp"].join(",")}
+                      className="sr-only"
+                      onChange={handleComposeImageChange}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={submitPost}
+                    className="vx-btn-primary vx-post-btn min-h-11 shrink-0 rounded-xl px-4 text-sm font-semibold sm:px-5 sm:text-base"
+                  >
+                    POST
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <label
                   className={cn(
-                    "inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm text-secondary",
+                    "hidden min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm text-secondary",
                     "border-subtle bg-surface-subtle transition-colors",
+                    "min-[420px]:inline-flex",
                   )}
                 >
                   <svg
