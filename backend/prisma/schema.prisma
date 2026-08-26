@@ -119,6 +119,12 @@ model AimChallenge {
   resolution      String?  // positive | negative
   impact          Float?
   createdAt       DateTime @default(now())
+  // Purely descriptive context for the new Challenge wizard (MVP4) — which
+  // specific AimEvent/DomainAimEvent this dispute is about, if any. Not a
+  // relation on purpose (keeps this additive and avoids coupling to either
+  // event table's id space); never read by openChallenge/resolveChallenge.
+  contextEventId   String?
+  contextEventKind String? // "event" | "domain-event"
 
   targetUser User @relation("TargetUser", fields: [targetUserId], references: [id])
   challenger User @relation("ChallengerUser", fields: [challengerId], references: [id])

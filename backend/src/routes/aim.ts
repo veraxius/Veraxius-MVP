@@ -79,6 +79,10 @@ const ChallengeSchema = z.object({
     challengerId: zUuid,
     reason: zShortText,
     severity: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    // Optional — which specific signal this dispute is about, for display
+    // only (see AimChallenge.contextEventId comment in schema.prisma).
+    contextEventId: z.string().uuid().optional(),
+    contextEventKind: z.enum(["event", "domain-event"]).optional(),
 });
 
 const ResolveSchema = z.object({
@@ -203,12 +207,21 @@ router.post("/challenge", requireAuth, async (req, res) => {
         const parsed = ChallengeSchema.safeParse(req.body);
         if (!parsed.success) return invalidPayload(res);
 
-        const { targetUserId, challengerId, reason, severity } = parsed.data;
+        const { targetUserId, challengerId, reason, severity, contextEventId, contextEventKind } = parsed.data;
         if (challengerId !== req.userId) {
             return res.status(403).json({ error: "Forbidden" });
         }
 
-        const challenge = await openChallengeV2(challengerId, targetUserId, reason, severity);
+        let challenge = await openChallengeV2(challengerId, targetUserId, reason, severity);
+
+        // Purely descriptive — never read by the resolution math.
+        if (contextEventId) {
+            challenge = await prisma.aimChallenge.update({
+                where: { id: challenge.id },
+                data: { contextEventId, contextEventKind: contextEventKind ?? null },
+            });
+        }
+
         res.json({ challenge });
     } catch (err) {
         return internalError(res, err, "POST /api/aim/challenge");
