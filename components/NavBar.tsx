@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearAuth, getAuth } from "@/lib/auth";
 import { formatAimScoreLabel } from "@/lib/aimDisplay";
@@ -10,7 +10,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { VeraxiusLogo } from "@/components/VeraxiusLogo";
 export function NavBar() {
 	const pathname = usePathname();
-	const router = useRouter();
 	const [aim, setAim] = useState<{ score: number; status: string } | null>(null);
 	const [menuOpen, setMenuOpen] = useState(false);
 
@@ -60,8 +59,10 @@ export function NavBar() {
 
 	function handleSignOut() {
 		clearAuth();
-		router.replace("/login");
-		router.refresh();
+		// A full browser navigation (not router.replace) discards the current
+		// page's in-memory React state entirely, so the browser can't restore
+		// this signed-in view from bfcache when the user presses back.
+		window.location.href = "/login";
 	}
 
 	return (
