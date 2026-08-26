@@ -32,6 +32,8 @@ import eventsRouter from "./routes/events";
 
 import internalRouter from "./routes/internal";
 
+import evidenceRouter from "./routes/evidence";
+
 import { prisma } from "./config/prisma";
 
 import { applyDecayToAllUsers, runConsistencyCheck } from "./lib/aimV2";
@@ -91,6 +93,8 @@ app.use("/api/rankings", rankingsRouter);
 app.use("/api/events", eventsRouter);
 
 app.use("/internal", internalRouter);
+
+app.use("/api/evidence", evidenceRouter);
 
 
 

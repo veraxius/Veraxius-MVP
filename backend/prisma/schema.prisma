@@ -39,6 +39,8 @@ model User {
   userDomainScores         UserDomainScore[]
   domainAimEvents          DomainAimEvent[]          @relation("DomainEventOwner")
   domainAimEventsAsVoter   DomainAimEvent[]          @relation("DomainEventVoter")
+  // Evidence relations
+  evidenceUploads          Evidence[]
 }
 
 model Conversation {
@@ -83,8 +85,13 @@ model AimEvent {
   contextWeight Float   @default(1)
   metadata  Json?
   createdAt DateTime @default(now())
+  // Tamper-evidence hash (SHA-256 of the event's canonical fields), computed
+  // lazily the first time a Trust Receipt is generated for this event — not
+  // set at write time, so this never touches the live scoring engine.
+  contentHash String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evidence Evidence[]
 
   @@index([userId])
 }
@@ -115,6 +122,7 @@ model AimChallenge {
 
   targetUser User @relation("TargetUser", fields: [targetUserId], references: [id])
   challenger User @relation("ChallengerUser", fields: [challengerId], references: [id])
+  evidence   Evidence[]
 
   @@index([targetUserId])
 }
@@ -266,10 +274,14 @@ model DomainAimEvent {
   voterAimScore        Float?
   isReversed           Boolean  @default(false)
   createdAt            DateTime @default(now())
+  // Same tamper-evidence hash concept as AimEvent.contentHash — computed
+  // lazily, never at write time.
+  contentHash          String?
 
   user      User  @relation("DomainEventOwner", fields: [userId], references: [id], onDelete: Cascade)
   post      Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
   voterUser User? @relation("DomainEventVoter", fields: [voterUserId], references: [id], onDelete: SetNull)
+  evidence  Evidence[]
 
   @@index([userId, domainName])
   @@index([postId])
@@ -283,4 +295,34 @@ model Event {
   status    String   @default("pending")
   error     String?
   createdAt DateTime @default(now())
+}
+
+// Generic evidence file attached to an AimEvent, a DomainAimEvent, and/or a
+// dispute (AimChallenge). New in MVP4, backing the Trust Receipt and
+// Challenge screens. Exactly one of aimEventId / domainAimEventId /
+// challengeId is expected to be set per row (enforced in the route layer,
+// not the DB, so the schema stays flexible if a use case needs more than
+// one link later).
+model Evidence {
+  id               String   @id @default(uuid())
+  uploadedBy       String
+  aimEventId       String?
+  domainAimEventId String?
+  challengeId      String?
+  fileName         String
+  fileUrl          String
+  fileType         String
+  fileSize         Int
+  status           String   @default("validated") // validated | pending | rejected
+  createdAt        DateTime @default(now())
+
+  uploader       User            @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  aimEvent       AimEvent?       @relation(fields: [aimEventId], references: [id], onDelete: SetNull)
+  domainAimEvent DomainAimEvent? @relation(fields: [domainAimEventId], references: [id], onDelete: SetNull)
+  challenge      AimChallenge?   @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+
+  @@index([aimEventId])
+  @@index([domainAimEventId])
+  @@index([challengeId])
+  @@index([uploadedBy])
 }
