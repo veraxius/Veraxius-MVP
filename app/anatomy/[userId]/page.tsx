@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { API_URL } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import { formatAimScoreLabel, riskLevelFromFraction, riskLevelLabel, riskBadgeClass } from "@/lib/aimDisplay";
 import { HowAimWorksPanel } from "@/components/HowAimWorksPanel";
 
@@ -63,7 +63,7 @@ export default function AimAnatomyPage() {
 			try {
 				setLoading(true);
 				setError(null);
-				const resp = await fetch(`${API_URL}/api/aim/${userId}/anatomy`, { cache: "no-store" });
+				const resp = await apiFetch(`${API_URL}/api/aim/${userId}/anatomy`, { cache: "no-store" });
 				const json = await resp.json();
 				if (!resp.ok) throw new Error(json?.error || "Failed to load AIM anatomy");
 				if (cancelled) return;
@@ -198,24 +198,36 @@ export default function AimAnatomyPage() {
 										Score confidence: {(data.confidence * 100).toFixed(0)}%, based on your verified activity history.
 									</p>
 
-									<h4 className="mt-5 text-sm font-semibold">Key Assumptions</h4>
-									<ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-secondary">
-										{data.keyAssumptions.map((a) => (
-											<li key={a}>{a}</li>
-										))}
-									</ul>
+									{data.keyAssumptions.length > 0 && (
+										<>
+											<h4 className="mt-5 text-sm font-semibold">Key Assumptions</h4>
+											<ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-secondary">
+												{data.keyAssumptions.map((a) => (
+													<li key={a}>{a}</li>
+												))}
+											</ul>
+										</>
+									)}
 								</div>
 
 								<div className="vx-panel rounded-2xl p-5 sm:p-6">
-									<h3 className="text-base font-semibold">What you can do</h3>
-									<ul className="mt-2 space-y-2 text-sm text-secondary">
-										{data.suggestedActions.map((a) => (
-											<li key={a} className="flex gap-2">
-												<span className="text-amber">—</span>
-												<span>{a}</span>
-											</li>
-										))}
-									</ul>
+									{data.suggestedActions.length > 0 ? (
+										<>
+											<h3 className="text-base font-semibold">What you can do</h3>
+											<ul className="mt-2 space-y-2 text-sm text-secondary">
+												{data.suggestedActions.map((a) => (
+													<li key={a} className="flex gap-2">
+														<span className="text-amber">—</span>
+														<span>{a}</span>
+													</li>
+												))}
+											</ul>
+										</>
+									) : (
+										<p className="text-sm text-secondary">
+											Sign in as this person to see personalized suggestions for improving their score.
+										</p>
+									)}
 
 									<div className="mt-5 rounded-lg border border-[var(--amber-border)] p-3">
 										<p className="text-sm font-medium">Every score is explainable.</p>

@@ -14,7 +14,7 @@ import {
     recomputeAIMScore,
 } from "../lib/aimV2";
 import { microRecalcQueue } from "../lib/aimQueue";
-import { recalculateDomainScore, onPostCreated } from "../lib/domainScoreService";
+import { recalculateDomainScore, onPostCreated, extractUserIdFromBearer } from "../lib/domainScoreService";
 import { buildAimAnatomy } from "../lib/aimAnatomy";
 import { buildAimEventReceipt, buildDomainAimEventReceipt } from "../lib/receiptBuilder";
 import type { SignalKind } from "../lib/signalNormalizer";
@@ -395,6 +395,15 @@ router.get("/:userId/anatomy", async (req, res) => {
 
         const anatomy = await buildAimAnatomy(params.data.userId);
         if (!anatomy) return res.status(404).json({ error: "User not found" });
+
+        // Score/domain breakdown is public (same as the rest of the profile),
+        // but the personalized coaching content is owner-only.
+        const requesterId = extractUserIdFromBearer(req.headers.authorization);
+        const isOwner = requesterId === params.data.userId;
+        if (!isOwner) {
+            anatomy.keyAssumptions = [];
+            anatomy.suggestedActions = [];
+        }
 
         return res.json(anatomy);
     } catch (err) {
