@@ -385,9 +385,9 @@ router.get("/domain-events/:id/receipt", requireAuth, async (req, res) => {
     }
 });
 
-// MVP4 — read-only AIM Anatomy breakdown (draft domain mapping, see
-// src/config/domainMapping.ts). Purely additive: no writes, no score
-// recompute, does not touch the scoring engine.
+// Read-only AIM Anatomy breakdown, grouped by the 5 real scoring-engine
+// categories (see src/config/domainMapping.ts). Purely additive: no writes,
+// no score recompute, does not touch the scoring engine.
 router.get("/:userId/anatomy", async (req, res) => {
     try {
         const params = UserIdParamsSchema.safeParse(req.params);

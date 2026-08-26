@@ -1,160 +1,167 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────
- * AIM MARKETING DOMAIN MAPPING (draft — pending Antonio's review)
+ * AIM SCORE CATEGORIES — real engine variables (Antonio's decision, 2026-08)
  * ─────────────────────────────────────────────────────────────────────────
  *
- * WHY THIS FILE EXISTS
- * The product narrative (MVP4 mockups) describes the AIM score as composed
- * of four dimensions: Commitment Fulfillment, Verification Strength,
- * Communication, Consistency. The actual scoring engine (aim.config.js +
- * aimV2.ts + signalNormalizer.ts) computes the score from five different
- * internal "variables": reliability, consistency, peer_validation,
- * contradiction, decay — driven by specific signal kinds (outcome_success,
- * claim_verified, peer_endorsement, challenge_opened_l1, etc.).
+ * SUPERSEDES the earlier 4-domain marketing mapping (Commitment Fulfillment /
+ * Verification Strength / Communication / Consistency), which has been
+ * discarded entirely. Product guidelines require that any terminology and
+ * math shown publicly matches the production model — no invented scoring
+ * mechanics for marketing purposes.
  *
- * This file is a ONE-WAY, ADDITIVE, DERIVED mapping from every existing
- * signal kind to one of the four marketing domains, so that new screens
- * (AIM Anatomy, Trust Receipt, Org Dashboard) can group and explain events
- * in the language the product uses — WITHOUT touching how the AIM number
- * itself is calculated. Nothing here is consumed by the scoring math in
- * aimV2.ts. It only feeds read-only, presentation-layer aggregation.
+ * What the user sees instead is the actual 5-variable model already used by
+ * aim.config.js / aimV2.ts to compute the score:
+ *   reliability, consistency, peer_validation, contradiction, decay
+ * — grouped directly from `SignalKind` in signalNormalizer.ts (the "Variable
+ * 1..5" comments there are the literal source of truth for this mapping,
+ * nothing here is inferred or invented).
  *
- * THIS IS A DRAFT. Every mapping below has a comment explaining the
- * reasoning. Antonio should review and this file is the ONLY place that
- * needs to change if the mapping is adjusted — nothing else in the codebase
- * references these domain names yet.
+ * This file is the ONLY place that needs to change if the user-facing
+ * labels/descriptions/threshold are revised.
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-/** The four AIM domains as presented in the product/marketing narrative. */
-export const AIM_DOMAINS = [
-	"commitment_fulfillment",
-	"verification_strength",
-	"communication",
+/** The 5 real master variables the AIM engine computes the score from. */
+export const AIM_CATEGORIES = [
+	"reliability",
 	"consistency",
+	"peer_validation",
+	"contradiction",
+	"decay",
 ] as const;
 
-export type AimDomainKey = (typeof AIM_DOMAINS)[number];
+export type AimCategoryKey = (typeof AIM_CATEGORIES)[number];
 
-export const AIM_DOMAIN_LABELS: Record<AimDomainKey, string> = {
-	commitment_fulfillment: "Commitment Fulfillment",
-	verification_strength: "Verification Strength",
-	communication: "Communication",
+/**
+ * User-facing labels. Antonio approved using friendly names instead of the
+ * internal variable names (his guidelines ask that end-user pages avoid
+ * technical/internal terminology) — but has NOT signed off on these exact
+ * words yet. Two are explicitly flagged below as pending his review.
+ */
+export const AIM_CATEGORY_LABELS: Record<AimCategoryKey, string> = {
+	reliability: "Follow-Through",
 	consistency: "Consistency",
+	peer_validation: "Peer Trust",
+	// PENDING ANTONIO'S REVIEW: "Disputes" reads as inherently negative even
+	// though this category also includes positive outcomes (a dismissed or
+	// mixed-resolution challenge, a malicious-accusation penalty against the
+	// OTHER party). A label that doesn't sound like an accusation by default
+	// may be needed.
+	contradiction: "Disputes",
+	// PENDING ANTONIO'S REVIEW: "Activity Level" implies the value goes UP
+	// with more activity, but this category is decay-only — it only ever
+	// moves DOWN (a small, gradual penalty for prolonged inactivity). A
+	// label that doesn't suggest an upward/positive metric may be needed.
+	decay: "Activity Level",
+};
+
+export const AIM_CATEGORY_DESCRIPTIONS: Record<AimCategoryKey, string> = {
+	reliability: "How often your outcomes and claims turn out to be true and get verified.",
+	consistency: "How stable and predictable your behavior has been over time.",
+	peer_validation: "How the community has endorsed or disputed your reliability.",
+	contradiction: "The effect of challenges raised against you and how they were resolved.",
+	decay: "A small ongoing adjustment reflecting how recently you've been active.",
 };
 
 /**
- * Default weight per domain, used ONLY by the new derived/presentation
- * layer (e.g. to compute a per-domain "AIM points" figure for the Anatomy
- * screen). This is a SEPARATE number from anything in aim.config.js and
- * does not affect the real AIM score. Mirrors the mockup's example
- * (Commitment Fulfillment = 32%); the rest are a placeholder even split
- * of the remainder until Antonio confirms real weights.
+ * Every one of the 19 real signal kinds the engine currently emits, mapped
+ * to its category. This is a 1:1 copy of the "Variable 1..5" grouping
+ * already present as comments on `SignalKind` in signalNormalizer.ts — kept
+ * here as an explicit, importable table rather than re-deriving it from a
+ * type union at runtime.
  */
-export const AIM_DOMAIN_WEIGHTS: Record<AimDomainKey, number> = {
-	commitment_fulfillment: 0.32,
-	verification_strength: 0.26,
-	communication: 0.21,
-	consistency: 0.21,
-};
+export const SIGNAL_TO_CATEGORY: Record<string, AimCategoryKey> = {
+	// Variable 1 — Reliability (6 signals)
+	outcome_success: "reliability",
+	outcome_failure: "reliability",
+	repeated_positive_outcome: "reliability",
+	repeated_negative_outcome: "reliability",
+	claim_verified: "reliability",
+	claim_unverified: "reliability",
 
-/**
- * Every signal kind the engine currently produces, mapped to one AIM
- * domain. Keyed by the `signal` value stored on `AimEvent.signal` — this
- * matches `SignalKind` in signalNormalizer.ts, which is already the
- * canonical identifier used across the codebase for these signal kinds.
- *
- * `DomainAimEvent.eventType` (the per-topic-domain event log used by
- * posts/domainScoreService.ts) reuses the SAME signal names for
- * "peer_endorsement", "peer_dispute", "inactivity_decay", and
- * "contradiction_detected" — so this same table covers both places an
- * event can come from without duplicating the mapping.
- */
-export const SIGNAL_TO_AIM_DOMAIN: Record<string, AimDomainKey> = {
-	// ── Reliability signals ────────────────────────────────────────────────
-	// "Did the person do what they said they'd do?" is literally the
-	// definition of Commitment Fulfillment in the product narrative.
-	outcome_success: "commitment_fulfillment",
-	outcome_failure: "commitment_fulfillment",
-	repeated_positive_outcome: "commitment_fulfillment",
-	repeated_negative_outcome: "commitment_fulfillment",
-
-	// These two are about a CLAIM being independently confirmed (or not) —
-	// that's verification, not follow-through on a promise.
-	claim_verified: "verification_strength",
-	claim_unverified: "verification_strength",
-
-	// ── Consistency signals ────────────────────────────────────────────────
-	// Direct 1:1 match — the engine's own "consistency" variable already
-	// means the same thing as the product's Consistency domain: stable,
-	// predictable behavior over time.
+	// Variable 2 — Consistency (2 signals)
 	consistency_match: "consistency",
 	consistency_break: "consistency",
 
-	// ── Peer validation signals ────────────────────────────────────────────
-	// There is no dedicated "communication quality" signal in the engine
-	// today. Peer endorsements/disputes are the closest proxy we have —
-	// they reflect how other people experienced interacting with this
-	// person (responsiveness, clarity, trustworthiness of exchanges), which
-	// is the best available stand-in for Communication until a more direct
-	// signal exists (e.g. response-time tracking, dispute-resolution tone).
-	// Flagging this as the weakest mapping in the table — see note below.
-	peer_endorsement: "communication",
-	peer_dispute: "communication",
+	// Variable 3 — Peer Validation (2 signals)
+	peer_endorsement: "peer_validation",
+	peer_dispute: "peer_validation",
 
-	// ── Contradiction / dispute signals ────────────────────────────────────
-	// A contradiction/challenge is fundamentally a question of whether a
-	// prior claim or verification still holds up under scrutiny — so all
-	// challenge-related signals are grouped under Verification Strength
-	// rather than split across domains. Keeping every contradiction signal
-	// in ONE bucket also keeps the "why did my score drop" story coherent:
-	// a user should not see the same dispute event nudge two domains.
-	challenge_opened_l1: "verification_strength",
-	challenge_opened_l2: "verification_strength",
-	challenge_opened_l3: "verification_strength",
-	challenge_resolved_upheld: "verification_strength",
-	challenge_resolved_dismissed: "verification_strength",
-	challenge_resolved_mixed: "verification_strength",
-	challenge_malicious_accusation: "verification_strength",
-	contradiction_detected: "verification_strength",
+	// Variable 4 — Contradiction (8 signals)
+	challenge_opened_l1: "contradiction",
+	challenge_opened_l2: "contradiction",
+	challenge_opened_l3: "contradiction",
+	challenge_resolved_upheld: "contradiction",
+	challenge_resolved_dismissed: "contradiction",
+	challenge_resolved_mixed: "contradiction",
+	challenge_resolved_malicious_penalty: "contradiction",
+	challenge_malicious_accusation: "contradiction", // signal name variant used on the stored AimEvent
+	contradiction_detected: "contradiction",
 
-	// ── Decay signals ───────────────────────────────────────────────────────
-	// Inactivity decay penalizes a user for going quiet for a long time —
-	// that is a stability/consistency concern (an active, steady presence),
-	// not a broken promise or a failed verification.
-	inactivity_decay: "consistency",
-
-	// ── Confidence/meta signals ─────────────────────────────────────────────
-	// This event carries delta 0 (it's informational — it records that
-	// verification level changed, e.g. email -> identity) but appears in
-	// the ledger, so it needs a bucket for display purposes.
-	verification_status_changed: "verification_strength",
+	// Variable 5 — Decay (1 signal)
+	inactivity_decay: "decay",
 };
 
 /**
- * Fallback domain for any signal not found in the table above (e.g. a new
- * signal kind added later and not yet mapped here). Consistency is picked
- * as the safest default because an "unclassified" behavioral signal is
- * closer to a general stability/track-record concept than to a specific
- * commitment or verification claim.
+ * Event types that exist in the ledger but are NOT one of the 19 scored
+ * signals above, and must never be forced into a category:
+ * - "confidence" / signal "verification_status_changed": delta-0,
+ *   informational only (records when someone's verification level
+ *   changed). Still shown in the general activity/event history and in a
+ *   Trust Receipt if one is requested for it — just excluded from the 5
+ *   category buckets and their trend math.
+ * - "base": the one-time account-initialization event, not an ongoing
+ *   signal.
  */
-const FALLBACK_DOMAIN: AimDomainKey = "consistency";
+const NON_SIGNAL_EVENT_TYPES = new Set(["confidence", "base"]);
+
+export function isNonCategorySignal(eventTypeOrSignal: string | null | undefined): boolean {
+	if (!eventTypeOrSignal) return false;
+	return NON_SIGNAL_EVENT_TYPES.has(eventTypeOrSignal);
+}
 
 /**
- * Resolve the AIM domain for a given signal/event-type string. Accepts
- * either an `AimEvent.signal` value or a `DomainAimEvent.eventType` value —
- * both vocabularies are covered by the same table (see comment above).
- * Returns the fallback domain (with a console warning) for anything
- * unmapped, so a missing entry never crashes a screen — it just needs to
- * be added here later.
+ * Resolve the category for a signal or event-type string. Returns null for
+ * informational/non-scored events (see isNonCategorySignal) — callers must
+ * handle that explicitly rather than falling back into a category, since
+ * that would misrepresent an informational event as a real signal.
+ * Falls back to "consistency" (with a console warning) only for a genuinely
+ * unmapped signal name (e.g. a new one added to the engine later and not
+ * yet added here).
  */
-export function getAimDomainForSignal(signal: string | null | undefined): AimDomainKey {
-	if (!signal) return FALLBACK_DOMAIN;
-	const mapped = SIGNAL_TO_AIM_DOMAIN[signal];
+export function getAimCategoryForSignal(signal: string | null | undefined): AimCategoryKey | null {
+	if (!signal) return null;
+	if (isNonCategorySignal(signal)) return null;
+	const mapped = SIGNAL_TO_CATEGORY[signal];
 	if (!mapped) {
 		// eslint-disable-next-line no-console
-		console.warn(`[domainMapping] Unmapped signal "${signal}" — falling back to "${FALLBACK_DOMAIN}". Add it to SIGNAL_TO_AIM_DOMAIN.`);
-		return FALLBACK_DOMAIN;
+		console.warn(`[domainMapping] Unmapped signal "${signal}" — falling back to "consistency". Add it to SIGNAL_TO_CATEGORY.`);
+		return "consistency";
 	}
 	return mapped;
+}
+
+/**
+ * Trend threshold, reused as-is from the AIM total's existing 30-day trend
+ * logic (backend/src/routes/users.ts, GET /:userId/aim-summary) so category
+ * trends behave consistently with the total. All 19 signals' deltas share
+ * the same rough scale (±0.02 to ±0.7 per event on the 0-1 baseline-0.5
+ * scale), so one shared threshold is used rather than inventing five
+ * separate ones without real usage data to justify different values.
+ * Revisit per-category if real data ever shows one category needs a
+ * different sensitivity.
+ */
+export const TREND_THRESHOLD = 0.005;
+
+/** Trend window, matching the AIM total's existing 30-day comparison. */
+export const TREND_WINDOW_DAYS = 30;
+
+export type Trend = "up" | "down" | "flat" | "insufficient_history";
+
+/** Categorize a raw 30-day delta into a trend state using TREND_THRESHOLD. */
+export function trendFromDelta(delta: number | null): Trend {
+	if (delta === null) return "insufficient_history";
+	if (delta > TREND_THRESHOLD) return "up";
+	if (delta < -TREND_THRESHOLD) return "down";
+	return "flat";
 }

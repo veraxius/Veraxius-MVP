@@ -1,18 +1,26 @@
 import { prisma } from "../config/prisma";
 import { calculateConfidence } from "./aimV2";
-import { getAimDomainForSignal, AIM_DOMAIN_LABELS } from "../config/domainMapping";
+import { getAimCategoryForSignal, AIM_CATEGORY_LABELS } from "../config/domainMapping";
 import { computeAimEventHash, computeDomainAimEventHash } from "./receiptHash";
 import { signReceiptToken, type ReceiptKind } from "./receiptShare";
 
 /**
- * Read-only Trust Receipt builder (MVP4). Never mutates score/history.
+ * Read-only Trust Receipt builder. Never mutates score/history.
  * The ONLY write this performs is a one-time, idempotent backfill of
  * `contentHash` on the event row the first time its receipt is requested
  * (skipped entirely if already set) — the scoring engine itself is never
  * touched.
  */
 
-export const POLICY_LABEL = "AIM Domain Mapping v0.1 (draft, pending review)";
+// aim.config.js has no version field to quote yet — naming the real source
+// file rather than inventing a version number.
+export const POLICY_LABEL = "Veraxius AIM Scoring Engine (aim.config.js)";
+
+// Used for the small number of ledger events that aren't one of the 19 real
+// scored signals (e.g. "confidence" / verification_status_changed) — the
+// receipt still needs a domain/domainLabel to render, but must not claim
+// these belong to one of the 5 real categories.
+const INFORMATIONAL_LABEL = "Informational";
 
 type EvidenceItem = {
 	id: string;
@@ -89,7 +97,9 @@ export async function buildAimEventReceipt(id: string): Promise<TrustReceipt | n
 	}
 
 	const signalKey = event.signal ?? event.eventType;
-	const domain = getAimDomainForSignal(signalKey);
+	const category = getAimCategoryForSignal(signalKey);
+	const domain = category ?? "informational";
+	const domainLabel = category ? AIM_CATEGORY_LABELS[category] : INFORMATIONAL_LABEL;
 
 	const [confidence, occurrences] = await Promise.all([
 		calculateConfidence(event.userId, "none"),
@@ -110,7 +120,7 @@ export async function buildAimEventReceipt(id: string): Promise<TrustReceipt | n
 		eventType: event.eventType,
 		signal: event.signal,
 		domain,
-		domainLabel: AIM_DOMAIN_LABELS[domain],
+		domainLabel,
 		delta: event.delta,
 		createdAt: event.createdAt.toISOString(),
 		contentHash,
@@ -149,7 +159,9 @@ export async function buildDomainAimEventReceipt(id: string): Promise<TrustRecei
 		await prisma.domainAimEvent.update({ where: { id: event.id }, data: { contentHash } });
 	}
 
-	const domain = getAimDomainForSignal(event.eventType);
+	const category = getAimCategoryForSignal(event.eventType);
+	const domain = category ?? "informational";
+	const domainLabel = category ? AIM_CATEGORY_LABELS[category] : INFORMATIONAL_LABEL;
 
 	const [confidence, occurrences] = await Promise.all([
 		calculateConfidence(event.userId, "none"),
@@ -170,7 +182,7 @@ export async function buildDomainAimEventReceipt(id: string): Promise<TrustRecei
 		eventType: event.eventType,
 		signal: event.domainName,
 		domain,
-		domainLabel: AIM_DOMAIN_LABELS[domain],
+		domainLabel,
 		delta: event.effectiveDelta,
 		createdAt: event.createdAt.toISOString(),
 		contentHash,

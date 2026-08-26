@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { API_URL, apiFetch } from "@/lib/api";
 import { formatAimScoreLabel, riskLevelFromFraction, riskLevelLabel, riskBadgeClass } from "@/lib/aimDisplay";
 import { HowAimWorksPanel } from "@/components/HowAimWorksPanel";
+import { TrendArrow, type Trend } from "@/components/TrendArrow";
 
 type AnatomyEvent = {
 	id: string;
@@ -17,13 +18,17 @@ type AnatomyEvent = {
 	evidenceCount: number;
 };
 
-type AnatomyDomain = {
-	key: "commitment_fulfillment" | "verification_strength" | "communication" | "consistency";
+type CategoryKey = "reliability" | "consistency" | "peer_validation" | "contradiction" | "decay";
+
+type AnatomyCategory = {
+	key: CategoryKey;
 	label: string;
-	weight: number;
+	description: string;
 	score: number;
 	eventCount: number;
 	totalDelta: number;
+	trend: Trend;
+	trendDelta30d: number | null;
 	topEvents: AnatomyEvent[];
 };
 
@@ -31,10 +36,12 @@ type AimAnatomy = {
 	userId: string;
 	aimScore: number;
 	aimStatus: string;
+	aimTrend: Trend;
+	aimTrendDelta30d: number | null;
 	confidence: number;
-	domains: AnatomyDomain[];
-	strongestDomain: AnatomyDomain["key"] | null;
-	weakestDomain: AnatomyDomain["key"] | null;
+	categories: AnatomyCategory[];
+	strongestCategory: CategoryKey | null;
+	weakestCategory: CategoryKey | null;
 	explanation: string;
 	keyAssumptions: string[];
 	suggestedActions: string[];
@@ -55,7 +62,7 @@ export default function AimAnatomyPage() {
 	const [data, setData] = useState<AimAnatomy | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [selectedDomain, setSelectedDomain] = useState<AnatomyDomain["key"] | null>(null);
+	const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -68,7 +75,7 @@ export default function AimAnatomyPage() {
 				if (!resp.ok) throw new Error(json?.error || "Failed to load AIM anatomy");
 				if (cancelled) return;
 				setData(json as AimAnatomy);
-				setSelectedDomain((json as AimAnatomy).domains[0]?.key ?? null);
+				setSelectedCategory((json as AimAnatomy).categories[0]?.key ?? null);
 			} catch (e) {
 				if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
 			} finally {
@@ -81,7 +88,7 @@ export default function AimAnatomyPage() {
 		};
 	}, [userId]);
 
-	const selected = data?.domains.find((d) => d.key === selectedDomain) ?? null;
+	const selected = data?.categories.find((c) => c.key === selectedCategory) ?? null;
 	const risk = data ? riskLevelFromFraction(data.aimScore) : null;
 
 	return (
@@ -108,8 +115,11 @@ export default function AimAnatomyPage() {
 							<section className="vx-panel rounded-2xl p-5 sm:p-6">
 								<div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
 									<div className="text-center sm:text-left">
-										<p className="text-4xl font-bold text-amber">{formatAimScoreLabel(data.aimScore)}</p>
-										<p className="vx-mono-label mt-1 text-tertiary">AIM SCORE</p>
+										<div className="flex items-center justify-center gap-2 sm:justify-start">
+											<p className="text-4xl font-bold text-amber">{formatAimScoreLabel(data.aimScore)}</p>
+											<TrendArrow trend={data.aimTrend} />
+										</div>
+										<p className="vx-mono-label mt-1 text-tertiary">AIM SCORE · last 30 days</p>
 										<span
 											className={`mt-2 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${riskBadgeClass(risk)}`}
 										>
@@ -128,22 +138,22 @@ export default function AimAnatomyPage() {
 										</div>
 									</div>
 								</div>
-								<p className="mt-4 text-xs text-tertiary">Click any domain below to see the evidence behind it.</p>
+								<p className="mt-4 text-xs text-tertiary">Click any category below to see the evidence behind it.</p>
 							</section>
 
-							<section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-								{data.domains.map((d) => (
+							<section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+								{data.categories.map((c) => (
 									<button
-										key={d.key}
+										key={c.key}
 										type="button"
-										onClick={() => setSelectedDomain(d.key)}
+										onClick={() => setSelectedCategory(c.key)}
 										className={`vx-panel rounded-xl p-4 text-left transition-colors ${
-											selectedDomain === d.key ? "border-[var(--amber)]" : ""
+											selectedCategory === c.key ? "border-[var(--amber)]" : ""
 										}`}
 									>
-										<p className="text-xs font-medium text-secondary">{d.label}</p>
-										<p className="mt-1 text-2xl font-bold">{formatAimScoreLabel(d.score)}</p>
-										<p className="mt-1 text-xs text-tertiary">Weight {(d.weight * 100).toFixed(0)}%</p>
+										<p className="text-xs font-medium text-secondary">{c.label}</p>
+										<p className="mt-1 text-2xl font-bold">{formatAimScoreLabel(c.score)}</p>
+										<TrendArrow trend={c.trend} className="mt-1" />
 									</button>
 								))}
 							</section>
@@ -152,15 +162,17 @@ export default function AimAnatomyPage() {
 								<section className="vx-panel rounded-2xl p-5 sm:p-6">
 									<div className="flex flex-wrap items-baseline justify-between gap-2">
 										<h2 className="text-lg font-semibold">{selected.label}</h2>
-										<span className="text-sm text-tertiary">Weight {(selected.weight * 100).toFixed(0)}% of AIM</span>
+										<TrendArrow trend={selected.trend} />
 									</div>
-									<p className="mt-1 text-sm text-secondary">
-										{selected.eventCount} contributing event{selected.eventCount === 1 ? "" : "s"} found for this domain.
+									<p className="mt-1 text-sm text-secondary">{selected.description}</p>
+									<p className="mt-1 text-xs text-tertiary">
+										{selected.eventCount} contributing event{selected.eventCount === 1 ? "" : "s"} found for this
+										category.
 									</p>
 
 									<div className="mt-4 space-y-2">
 										{selected.topEvents.length === 0 ? (
-											<p className="text-sm text-tertiary">No events recorded in this domain yet.</p>
+											<p className="text-sm text-tertiary">No events recorded in this category yet.</p>
 										) : (
 											selected.topEvents.map((ev) => (
 												<div
@@ -232,8 +244,8 @@ export default function AimAnatomyPage() {
 									<div className="mt-5 rounded-lg border border-[var(--amber-border)] p-3">
 										<p className="text-sm font-medium">Every score is explainable.</p>
 										<p className="mt-1 text-xs text-tertiary">
-											This breakdown uses a draft domain mapping pending internal review — the underlying events and
-											deltas are real; the grouping into these four categories may be adjusted.
+											These five categories are the real variables the scoring engine uses to compute your AIM — not a
+											marketing simplification. Their labels are still pending final review.
 										</p>
 									</div>
 								</div>
