@@ -319,7 +319,7 @@ export default function HomePage() {
                 {aimLoading && !mySummary ? (
                   <div className="h-36 w-36 sm:h-44 sm:w-44 shrink-0 rounded-full bg-[var(--surface-subtle)] animate-pulse" />
                 ) : mySummary ? (
-                  <Link href={`/profile/${me.id}`} className="shrink-0" title="View your AIM profile">
+                  <Link href={`/anatomy/${me.id}`} className="shrink-0" title="See the anatomy of your AIM score">
                     <AIMGaugeRing
                       aimFraction={mySummary.global_score}
                       colorClass={riskGaugeColorClass(mySummary.risk_level)}

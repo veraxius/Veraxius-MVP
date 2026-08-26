@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
 	riskBadgeClass,
 	riskGaugeColorClass,
@@ -304,11 +305,17 @@ export function AIMScoreHeroCard({
 			)}
 		>
 			<div className="flex flex-col items-center shrink-0 w-auto">
-				<AIMGaugeRing
-					aimFraction={summary.global_score}
-					colorClass={riskGaugeColorClass(summary.risk_level)}
-					compact={compact}
-				/>
+				<Link
+					href={`/anatomy/${userId}`}
+					title="See the anatomy of this AIM score"
+					className="transition-opacity hover:opacity-90"
+				>
+					<AIMGaugeRing
+						aimFraction={summary.global_score}
+						colorClass={riskGaugeColorClass(summary.risk_level)}
+						compact={compact}
+					/>
+				</Link>
 			</div>
 
 			<div

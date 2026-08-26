@@ -15,6 +15,7 @@ import {
 } from "../lib/aimV2";
 import { microRecalcQueue } from "../lib/aimQueue";
 import { recalculateDomainScore, onPostCreated } from "../lib/domainScoreService";
+import { buildAimAnatomy } from "../lib/aimAnatomy";
 import type { SignalKind } from "../lib/signalNormalizer";
 import { requireAuth } from "../middleware/auth";
 import { requireCronSecret } from "../middleware/cronSecret";
@@ -335,6 +336,23 @@ router.post("/domains/reclassify-posts", requireCronSecret, async (_req, res) =>
         res.json({ ok: true, classified });
     } catch (err) {
         return internalError(res, err, "POST /api/aim/domains/reclassify-posts");
+    }
+});
+
+// MVP4 — read-only AIM Anatomy breakdown (draft domain mapping, see
+// src/config/domainMapping.ts). Purely additive: no writes, no score
+// recompute, does not touch the scoring engine.
+router.get("/:userId/anatomy", async (req, res) => {
+    try {
+        const params = UserIdParamsSchema.safeParse(req.params);
+        if (!params.success) return invalidPayload(res);
+
+        const anatomy = await buildAimAnatomy(params.data.userId);
+        if (!anatomy) return res.status(404).json({ error: "User not found" });
+
+        return res.json(anatomy);
+    } catch (err) {
+        return internalError(res, err, "GET /api/aim/:userId/anatomy");
     }
 });
 
