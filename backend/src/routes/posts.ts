@@ -256,13 +256,23 @@ router.post("/:id/react", requireAuth, async (req, res) => {
       return res.json({ toggled: "off" });
     }
 
-    await prisma.postReaction.create({
-      data: {
-        postId,
-        userId,
-        type,
-      },
-    });
+    try {
+      await prisma.postReaction.create({
+        data: {
+          postId,
+          userId,
+          type,
+        },
+      });
+    } catch (err) {
+      // A double-click / duplicate request can race past the findUnique
+      // check above. The reaction already exists in that case — treat it
+      // as a no-op instead of a 500.
+      const isDuplicate =
+        err instanceof Error && "code" in err && (err as { code?: string }).code === "P2002";
+      if (!isDuplicate) throw err;
+      return res.json({ toggled: "on" });
+    }
 
     if (isTrustSignal) {
       const voter = await prisma.user.findUnique({
