@@ -136,6 +136,17 @@ export default function ProfilePage() {
 							className="w-full max-w-sm min-w-0"
 						/>
 					</div>
+
+					{userId && (
+						<div className="flex w-full justify-center">
+							<Link
+								href={`/anatomy/${userId}`}
+								className="text-sm text-amber hover:underline"
+							>
+								See the anatomy of this AIM score →
+							</Link>
+						</div>
+					)}
 				</div>
 
 				<AIMScoreHeroCard
