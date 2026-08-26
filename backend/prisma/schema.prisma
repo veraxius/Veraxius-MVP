@@ -16,6 +16,9 @@ model User {
   profilePictureUrl String?
   resetToken       String?
   resetTokenExpiry DateTime?
+  emailVerified           Boolean   @default(false)
+  verificationCode        String?
+  verificationCodeExpiry  DateTime?
   created_at   DateTime                  @default(now())
   lastActiveAt DateTime?
   aimConfidence Decimal?                 @db.Decimal(3, 2)

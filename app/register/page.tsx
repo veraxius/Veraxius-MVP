@@ -53,6 +53,12 @@ export default function RegisterPage() {
   const googleRenderedRef = useRef(false);
 
   const [newUserId, setNewUserId] = useState<string | null>(null);
+  const [emailAlreadyVerified, setEmailAlreadyVerified] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const handleGoogleCredential = useCallback(
     async (response: GoogleCredentialResponse) => {
@@ -80,6 +86,8 @@ export default function RegisterPage() {
         if (!token) throw new Error("Google sign-in succeeded but no token was returned");
         saveAuth(token, data.user, data.refresh_token);
         setNewUserId(data.user?.id ?? null);
+        setEmail(data.user?.email ?? "");
+        setEmailAlreadyVerified(Boolean(data.user?.emailVerified));
         setStep(2);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Unexpected error");
@@ -150,6 +158,7 @@ export default function RegisterPage() {
       const token = data.token || data.access_token;
       saveAuth(token, data.user, data.refresh_token);
       setNewUserId(data.user?.id ?? null);
+      setEmailAlreadyVerified(Boolean(data.user?.emailVerified));
       setStep(2);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unexpected error");
@@ -157,6 +166,53 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  async function handleVerifyCode() {
+    setVerifyError(null);
+    if (verificationCode.trim().length !== 6) {
+      setVerifyError("Enter the 6-digit code from your email");
+      return;
+    }
+    setVerifyLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: verificationCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Verification failed");
+      setVerified(true);
+    } catch (err: unknown) {
+      setVerifyError(err instanceof Error ? err.message : "Unexpected error");
+    } finally {
+      setVerifyLoading(false);
+    }
+  }
+
+  async function handleResendCode() {
+    if (resendCooldown > 0) return;
+    setVerifyError(null);
+    try {
+      await fetch(`${API_URL}/api/auth/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResendCooldown(30);
+      const timer = setInterval(() => {
+        setResendCooldown((s) => {
+          if (s <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    } catch {
+      setVerifyError("Failed to resend code — please try again in a moment");
+    }
+  }
 
   const me = getAuth()?.user;
 
@@ -361,17 +417,62 @@ export default function RegisterPage() {
             )}
 
             {step === 3 && (
-              <div className="space-y-4 text-center">
-                <p className="vx-body-sm text-secondary">
-                  Identity verification isn&apos;t available yet — you can skip this for now and add it later from
-                  your profile once it launches.
-                </p>
+              <div className="space-y-4">
+                {emailAlreadyVerified || verified ? (
+                  <div className="space-y-4 text-center">
+                    <div className="rounded-lg border border-green/40 bg-green/10 p-3">
+                      <p className="text-sm font-medium text-green">Email verified ✓</p>
+                    </div>
+                    <p className="vx-body-sm text-secondary">
+                      Identity verification (beyond email) isn&apos;t available yet — you can add it later from your
+                      profile once it launches.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 text-center">
+                    <p className="vx-body-sm text-secondary">
+                      We sent a 6-digit code to <span className="font-medium text-[var(--text-primary)]">{email}</span>.
+                      Enter it below to verify you own this email address.
+                    </p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
+                      placeholder="000000"
+                      className={cn(
+                        "w-full rounded-lg border bg-transparent px-4 py-3 min-h-11 text-center text-lg tracking-[0.5em] outline-none",
+                        "border-[var(--divider)] focus:border-[var(--amber-border)]",
+                        "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
+                      )}
+                    />
+                    {verifyError && <p className="vx-body-sm text-red">{verifyError}</p>}
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={verifyLoading}
+                      className={cn("vx-btn-primary w-full rounded-lg min-h-11 text-sm font-semibold", verifyLoading && "opacity-70")}
+                    >
+                      {verifyLoading ? "Verifying..." : "Verify email"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResendCode}
+                      disabled={resendCooldown > 0}
+                      className="text-xs text-amber hover:underline disabled:opacity-50 disabled:no-underline"
+                    >
+                      {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend code"}
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => router.push("/home")}
-                  className="vx-btn-primary w-full rounded-lg min-h-11 text-sm font-semibold"
+                  className="vx-btn-secondary w-full rounded-lg min-h-11 text-sm font-semibold"
                 >
-                  Finish — go to my feed
+                  {emailAlreadyVerified || verified ? "Finish — go to my feed" : "Skip for now — go to my feed"}
                 </button>
               </div>
             )}

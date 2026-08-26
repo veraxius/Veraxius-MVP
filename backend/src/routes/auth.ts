@@ -23,6 +23,32 @@ function hashResetToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+const VERIFICATION_CODE_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+
+function generateVerificationCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+}
+
+function hashVerificationCode(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
+}
+
+async function sendVerificationEmail(email: string, code: string) {
+  await resend.emails.send({
+    from: "Veraxius <noreply@veraxius.com>",
+    to: email,
+    subject: "Verify your Veraxius email",
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #111;">
+        <h2 style="margin:0 0 12px 0;">Verify your email</h2>
+        <p>Enter this code to verify your Veraxius account:</p>
+        <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px; margin: 16px 0;">${code}</p>
+        <p style="opacity: 0.7; font-size: 14px;">This code expires in 15 minutes. If you didn't create a Veraxius account, you can safely ignore this email.</p>
+      </div>
+    `,
+  });
+}
+
 function signAccessToken(userId: string) {
   const secret = process.env.JWT_SECRET!;
   return jwt.sign({ sub: userId, type: "access" }, secret, {
@@ -37,13 +63,14 @@ function signRefreshToken(userId: string) {
   });
 }
 
-const userSelect = { id: true, email: true, name: true, created_at: true } as const;
+const userSelect = { id: true, email: true, name: true, created_at: true, emailVerified: true } as const;
 
 function buildAuthResponse(user: {
   id: string;
   email: string;
   name: string | null;
   created_at: Date;
+  emailVerified: boolean;
 }) {
   const access_token = signAccessToken(user.id);
   const refresh_token = signRefreshToken(user.id);
@@ -57,6 +84,7 @@ function buildAuthResponse(user: {
       email: user.email,
       name: user.name,
       created_at: user.created_at,
+      emailVerified: user.emailVerified,
     },
   };
 }
@@ -90,6 +118,15 @@ const ResetPasswordSchema = z.object({
   newPassword: zPassword,
 });
 
+const VerifyEmailSchema = z.object({
+  email: zEmail,
+  code: z.string().length(6),
+});
+
+const ResendVerificationSchema = z.object({
+  email: zEmail,
+});
+
 router.post("/register", authRateLimiter, async (req, res) => {
   try {
     const parsed = RegisterSchema.safeParse(req.body);
@@ -106,10 +143,25 @@ router.post("/register", authRateLimiter, async (req, res) => {
     const saltRounds = 10;
     const hashed = await bcrypt.hash(password, saltRounds);
 
+    const rawCode = generateVerificationCode();
     const user = await prisma.user.create({
-      data: { email, password: hashed, name },
+      data: {
+        email,
+        password: hashed,
+        name,
+        verificationCode: hashVerificationCode(rawCode),
+        verificationCodeExpiry: new Date(Date.now() + VERIFICATION_CODE_EXPIRY_MS),
+      },
       select: userSelect,
     });
+
+    try {
+      await sendVerificationEmail(email, rawCode);
+    } catch (err) {
+      // Don't block registration if the email fails to send — the user can
+      // request a new code from the Verify step.
+      console.error("Send verification email error:", err);
+    }
 
     return res.status(201).json(buildAuthResponse(user));
   } catch (err) {
@@ -140,6 +192,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
       email: userRecord.email,
       name: userRecord.name,
       created_at: userRecord.created_at,
+      emailVerified: userRecord.emailVerified,
     };
     return res.status(200).json(buildAuthResponse(user));
   } catch (err) {
@@ -182,9 +235,11 @@ router.post("/google", authRateLimiter, async (req, res) => {
 
     if (user) {
       if (!user.googleId) {
+        // Google already confirmed this email is real — no need to make
+        // them go through the code-based verification too.
         const updated = await prisma.user.update({
           where: { id: user.id },
-          data: { googleId },
+          data: { googleId, emailVerified: true },
           select: userSelect,
         });
         return res.status(200).json(buildAuthResponse(updated));
@@ -194,7 +249,7 @@ router.post("/google", authRateLimiter, async (req, res) => {
     } else {
       const hashed = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
       const created = await prisma.user.create({
-        data: { email, name, password: hashed, googleId },
+        data: { email, name, password: hashed, googleId, emailVerified: true },
         select: userSelect,
       });
       return res.status(201).json(buildAuthResponse(created));
@@ -320,6 +375,74 @@ router.post("/reset-password", authRateLimiter, async (req, res) => {
     return res.status(200).json({ message: "Password reset successfully" });
   } catch (err) {
     return internalError(res, err, "Reset password error:");
+  }
+});
+
+router.post("/verify-email", authRateLimiter, async (req, res) => {
+  try {
+    const parsed = VerifyEmailSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return invalidPayload(res);
+    }
+
+    const { email, code } = parsed.data;
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (
+      !user?.verificationCode ||
+      !user.verificationCodeExpiry ||
+      user.verificationCodeExpiry < new Date() ||
+      user.verificationCode !== hashVerificationCode(code)
+    ) {
+      return res.status(400).json({ error: "Invalid or expired verification code" });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        verificationCode: null,
+        verificationCodeExpiry: null,
+      },
+    });
+
+    return res.status(200).json({ message: "Email verified successfully" });
+  } catch (err) {
+    return internalError(res, err, "Verify email error:");
+  }
+});
+
+router.post("/resend-verification", authRateLimiter, async (req, res) => {
+  const GENERIC_MESSAGE = "If that email needs verification, a new code has been sent";
+  try {
+    const parsed = ResendVerificationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return invalidPayload(res);
+    }
+
+    const { email } = parsed.data;
+
+    try {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user && !user.emailVerified) {
+        const rawCode = generateVerificationCode();
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            verificationCode: hashVerificationCode(rawCode),
+            verificationCodeExpiry: new Date(Date.now() + VERIFICATION_CODE_EXPIRY_MS),
+          },
+        });
+        await sendVerificationEmail(email, rawCode);
+      }
+    } catch (err) {
+      console.error("Resend verification error:", err);
+    }
+
+    return res.status(200).json({ message: GENERIC_MESSAGE });
+  } catch (err) {
+    console.error("Resend verification error:", err);
+    return res.status(200).json({ message: GENERIC_MESSAGE });
   }
 });
 
