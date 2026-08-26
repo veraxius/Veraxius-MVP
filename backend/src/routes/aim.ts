@@ -16,6 +16,7 @@ import {
 import { microRecalcQueue } from "../lib/aimQueue";
 import { recalculateDomainScore, onPostCreated } from "../lib/domainScoreService";
 import { buildAimAnatomy } from "../lib/aimAnatomy";
+import { buildAimEventReceipt, buildDomainAimEventReceipt } from "../lib/receiptBuilder";
 import type { SignalKind } from "../lib/signalNormalizer";
 import { requireAuth } from "../middleware/auth";
 import { requireCronSecret } from "../middleware/cronSecret";
@@ -336,6 +337,38 @@ router.post("/domains/reclassify-posts", requireCronSecret, async (_req, res) =>
         res.json({ ok: true, classified });
     } catch (err) {
         return internalError(res, err, "POST /api/aim/domains/reclassify-posts");
+    }
+});
+
+const ReceiptIdParamsSchema = z.object({ id: zUuid });
+
+// MVP4 — read-only Trust Receipt for a single AimEvent. Auth required (any
+// signed-in user); the receipt itself is what gets shared via the separate
+// public /api/public/receipt link, not this endpoint.
+router.get("/events/:id/receipt", requireAuth, async (req, res) => {
+    try {
+        const params = ReceiptIdParamsSchema.safeParse(req.params);
+        if (!params.success) return invalidPayload(res);
+
+        const receipt = await buildAimEventReceipt(params.data.id);
+        if (!receipt) return res.status(404).json({ error: "Event not found" });
+        return res.json(receipt);
+    } catch (err) {
+        return internalError(res, err, "GET /api/aim/events/:id/receipt");
+    }
+});
+
+// Same as above, for DomainAimEvent (post-scoped topic signals).
+router.get("/domain-events/:id/receipt", requireAuth, async (req, res) => {
+    try {
+        const params = ReceiptIdParamsSchema.safeParse(req.params);
+        if (!params.success) return invalidPayload(res);
+
+        const receipt = await buildDomainAimEventReceipt(params.data.id);
+        if (!receipt) return res.status(404).json({ error: "Event not found" });
+        return res.json(receipt);
+    } catch (err) {
+        return internalError(res, err, "GET /api/aim/domain-events/:id/receipt");
     }
 });
 

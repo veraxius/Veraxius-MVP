@@ -34,6 +34,8 @@ import internalRouter from "./routes/internal";
 
 import evidenceRouter from "./routes/evidence";
 
+import publicReceiptsRouter from "./routes/publicReceipts";
+
 import { prisma } from "./config/prisma";
 
 import { applyDecayToAllUsers, runConsistencyCheck } from "./lib/aimV2";
@@ -95,6 +97,8 @@ app.use("/api/events", eventsRouter);
 app.use("/internal", internalRouter);
 
 app.use("/api/evidence", evidenceRouter);
+
+app.use("/api/public/receipt", publicReceiptsRouter);
 
 
 
