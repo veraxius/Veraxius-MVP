@@ -265,29 +265,46 @@ export async function runConsistencyCheck(userId: string) {
 	const domainScoreRec = primary ? await prisma.aimDomainScore.findUnique({ where: { userId_domain: { userId, domain: primary } } }) : null;
 	const hasPrimaryActivity = (domainScoreRec?.interactionCount ?? 0) > 0;
 
-	let breaks  = 0;
-	let matches = 0;
-	if (latencyDev > 0.5)       breaks  += 1;
-	if (postFreqDev > 0.7)      breaks  += 1;
-	if (votePatternDev > 0.4)   breaks  += 1;
-	if (primary && !hasPrimaryActivity) breaks  += 1;
-	if (primary && hasPrimaryActivity)  matches += 1;
+	// Current state of each tracked condition, evaluated fresh every run.
+	const curFlags = {
+		latency:     latencyDev > 0.5,
+		postFreq:    postFreqDev > 0.7,
+		votePattern: votePatternDev > 0.4,
+		alignmentBreak: Boolean(primary) && !hasPrimaryActivity,
+		alignmentMatch: Boolean(primary) && hasPrimaryActivity,
+	};
+
+	// This check runs weekly for every user (see index.ts). A condition that
+	// simply PERSISTS (e.g. still no activity in the primary domain) must
+	// only be scored once, when it first becomes true — otherwise the same
+	// -0.5/-0.4/-0.2 penalty (or +0.2 bonus) reapplies every single week
+	// forever, compounding without bound for as long as the state doesn't
+	// change. We only emit an event on a false -> true transition, compared
+	// against the flags recorded on the previous run.
+	const existing = await prisma.aimConsistency.findUnique({ where: { userId } });
+	const prevSnapshot = (existing?.lastSnapshot ?? null) as null | { flags?: Partial<typeof curFlags> };
+	const prevFlags = prevSnapshot?.flags ?? {};
+
+	const breaks  = Number(curFlags.latency) + Number(curFlags.postFreq) + Number(curFlags.votePattern) + Number(curFlags.alignmentBreak);
+	const matches = Number(curFlags.alignmentMatch);
 
 	await prisma.aimConsistency.upsert({
 		where:  { userId },
-		update: { breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, recentLatency, baselineLatency, postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
-		create: { userId, breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, recentLatency, baselineLatency, postFreqDev, votePatternDev, primary, hasPrimaryActivity } },
+		update: { breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, recentLatency, baselineLatency, postFreqDev, votePatternDev, primary, hasPrimaryActivity, flags: curFlags } },
+		create: { userId, breakCount: breaks, matchCount: matches, lastSnapshot: { latencyDev, recentLatency, baselineLatency, postFreqDev, votePatternDev, primary, hasPrimaryActivity, flags: curFlags } },
 	});
 
 	type EventData = Parameters<typeof prisma.aimEvent.create>[0]["data"];
 	const events: EventData[] = [];
 	const cfg = AIMCFG.consistency;
 
-	if (latencyDev > 0.5)    events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyA, weight: 1, contextWeight: 1, metadata: { kind: "latency_deviation",     value: latencyDev } });
-	if (postFreqDev > 0.7)   events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyB, weight: 1, contextWeight: 1, metadata: { kind: "post_frequency_drop",   value: postFreqDev } });
-	if (votePatternDev > 0.4) events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyC, weight: 1, contextWeight: 1, metadata: { kind: "vote_pattern_change",   value: votePatternDev } });
-	if (primary && !hasPrimaryActivity) events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyD, weight: 1, contextWeight: 1, metadata: { kind: "claim_action_alignment", primary } });
-	if (primary && hasPrimaryActivity)  events.push({ userId, eventType: "consistency", signal: "consistency_match", delta: cfg.matchBonusD,   weight: 1, contextWeight: 1, metadata: { kind: "claim_action_alignment", primary } });
+	const isNewly = (key: keyof typeof curFlags) => curFlags[key] && !prevFlags[key];
+
+	if (isNewly("latency"))        events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyA, weight: 1, contextWeight: 1, metadata: { kind: "latency_deviation",     value: latencyDev } });
+	if (isNewly("postFreq"))       events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyB, weight: 1, contextWeight: 1, metadata: { kind: "post_frequency_drop",   value: postFreqDev } });
+	if (isNewly("votePattern"))    events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyC, weight: 1, contextWeight: 1, metadata: { kind: "vote_pattern_change",   value: votePatternDev } });
+	if (isNewly("alignmentBreak")) events.push({ userId, eventType: "consistency", signal: "consistency_break", delta: cfg.breakPenaltyD, weight: 1, contextWeight: 1, metadata: { kind: "claim_action_alignment", primary } });
+	if (isNewly("alignmentMatch")) events.push({ userId, eventType: "consistency", signal: "consistency_match", delta: cfg.matchBonusD,   weight: 1, contextWeight: 1, metadata: { kind: "claim_action_alignment", primary } });
 
 	if (events.length) {
 		await prisma.$transaction(events.map(data => prisma.aimEvent.create({ data })));
