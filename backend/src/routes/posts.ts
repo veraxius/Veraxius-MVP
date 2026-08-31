@@ -5,7 +5,7 @@ import { Readable } from "stream";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
-import { recordPeerFeedback } from "../lib/aimV2";
+import { recordPeerFeedback, recomputeAIMScore } from "../lib/aimV2";
 import { onPostCreated, onPostDeleted } from "../lib/domainScoreService";
 import { processPendingEvents } from "../lib/eventProcessor";
 import { zContent, invalidPayload, internalError } from "../lib/validation";
@@ -274,7 +274,7 @@ router.post("/:id/react", requireAuth, async (req, res) => {
           ? "same"
           : "different";
 
-      await recordPeerFeedback({
+      const feedbackResult = await recordPeerFeedback({
         targetId: authorUserId,
         voterId: userId,
         postId,
@@ -303,14 +303,24 @@ router.post("/:id/react", requireAuth, async (req, res) => {
         },
       });
 
-      // processPendingEvents() -> handlePeerFeedback() -> onTrustVote() already
-      // calls recomputeAIMScore(authorUserId, domain), which sums the
-      // AimEvent that recordPeerFeedback() just created (with its rate
-      // limiting, cooldown, and anti-abuse protections already applied) into
-      // the author's real aimScore. No separate score bump belongs here —
-      // there used to be one (a flat, unprotected +/-0.20 on every click,
-      // bypassing all of the above), which has been removed as a bug fix.
+      // processPendingEvents() -> handlePeerFeedback() -> onTrustVote() ALSO
+      // calls recomputeAIMScore(authorUserId, domain) — but only when the
+      // post has a classified domain (it returns early otherwise, e.g. while
+      // domain classification is still pending or the content wasn't
+      // classifiable). That path additionally updates the per-domain score
+      // when it does run, so we still call it.
       await processPendingEvents();
+
+      // The author's real aimScore must update regardless of whether domain
+      // classification succeeded — recordPeerFeedback() already created the
+      // real, protected AimEvent above; only skip the recompute when that
+      // event itself was skipped (rate limit / cooldown), matching what was
+      // actually recorded.
+      if (!feedbackResult.skipped) {
+        await recomputeAIMScore(authorUserId, author?.aimDomainPrimary ?? undefined, {
+          historyContext: "peer_feedback",
+        });
+      }
     }
 
     return res.json({ toggled: "on" });
