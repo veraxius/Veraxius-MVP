@@ -74,25 +74,6 @@ function handlePostImageUpload(
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const AIMCFG = require("../../aim.config.js");
-const POST_TRUST_DELTA = AIMCFG.postTrustReactionIncrement ?? 0.2;
-const AIM_MAX_SCORE: number = AIMCFG.maxScore ?? 100;
-
-async function bumpAuthorAimScore(authorUserId: string, delta: number) {
-  const user = await prisma.user.findUnique({
-    where: { id: authorUserId },
-    select: { aimScore: true },
-  });
-  if (!user) return;
-
-  const next = Math.min(AIM_MAX_SCORE, Math.max(0, user.aimScore + delta));
-  await prisma.user.update({
-    where: { id: authorUserId },
-    data: { aimScore: next },
-  });
-}
-
 const router = Router();
 
 const CreatePostSchema = z.object({
@@ -246,13 +227,10 @@ router.post("/:id/react", requireAuth, async (req, res) => {
         where: { id: existing.id },
       });
 
-      if (isTrustSignal) {
-        await bumpAuthorAimScore(
-          authorUserId,
-          type === "confiable" ? -POST_TRUST_DELTA : POST_TRUST_DELTA,
-        );
-      }
-
+      // Note: removing a reaction does not reverse the AimEvent that was
+      // recorded when it was given — that event (and its recomputed effect
+      // on the author's score) stands. Un-reacting only removes the
+      // reaction row itself.
       return res.json({ toggled: "off" });
     }
 
@@ -325,12 +303,14 @@ router.post("/:id/react", requireAuth, async (req, res) => {
         },
       });
 
+      // processPendingEvents() -> handlePeerFeedback() -> onTrustVote() already
+      // calls recomputeAIMScore(authorUserId, domain), which sums the
+      // AimEvent that recordPeerFeedback() just created (with its rate
+      // limiting, cooldown, and anti-abuse protections already applied) into
+      // the author's real aimScore. No separate score bump belongs here —
+      // there used to be one (a flat, unprotected +/-0.20 on every click,
+      // bypassing all of the above), which has been removed as a bug fix.
       await processPendingEvents();
-
-      await bumpAuthorAimScore(
-        authorUserId,
-        type === "confiable" ? POST_TRUST_DELTA : -POST_TRUST_DELTA,
-      );
     }
 
     return res.json({ toggled: "on" });
