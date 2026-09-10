@@ -44,6 +44,8 @@ model User {
   domainAimEventsAsVoter   DomainAimEvent[]          @relation("DomainEventVoter")
   // Evidence relations
   evidenceUploads          Evidence[]
+  // MVP5 — AIM Trust & Authority Layer relation
+  aimMvp5Entities           Entity[]
 }
 
 model Conversation {
@@ -314,7 +316,8 @@ model Event {
 // one link later).
 model Evidence {
   id               String   @id @default(uuid())
-  uploadedBy       String
+  uploadedBy       String? // nullable — MVP5 machine-generated Evidence (outcomes,
+                            // API responses) has no human uploader (Directive §8)
   aimEventId       String?
   domainAimEventId String?
   challengeId      String?
@@ -325,13 +328,368 @@ model Evidence {
   status           String   @default("validated") // validated | pending | rejected
   createdAt        DateTime @default(now())
 
-  uploader       User            @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  uploader       User?           @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
   aimEvent       AimEvent?       @relation(fields: [aimEventId], references: [id], onDelete: SetNull)
   domainAimEvent DomainAimEvent? @relation(fields: [domainAimEventId], references: [id], onDelete: SetNull)
   challenge      AimChallenge?   @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+
+  // MVP5 — AIM Trust & Authority Layer extension (Architecture Alignment FINAL, §B).
+  // All nullable; existing file-upload rows are unaffected. Plain indexed columns,
+  // not enforced relations, matching how Claim/Decision cross-reference Evidence
+  // in the ontology (see Signal/Decision/etc. below for the same convention).
+  evidenceType            String?   // document | observation | api_response | attestation |
+                                     // verified_claim | machine_event | human_verification |
+                                     // policy_result | outcome
+  provenance              Json?
+  observedAt              DateTime?
+  claimId                 String?
+  decisionId              String?
+  contentHash             String?   // Correction #7 — evidence integrity hash
+  hashAlgorithm           String?
+  canonicalizationVersion String?
 
   @@index([aimEventId])
   @@index([domainAimEventId])
   @@index([challengeId])
   @@index([uploadedBy])
+  @@index([claimId])
+  @@index([decisionId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MVP5 — AIM TRUST & AUTHORITY LAYER
+// Per "VERAXIUS AIM MVP5 — Architecture Alignment FINAL" (consolidates Directive
+// v1.0 + Addendum v1.0 + Addendum v2.0, all ten corrections applied).
+// Purely additive: no existing model above this line is touched. This layer
+// extends the same AIM architecture — reliability, consistency, peer_validation,
+// contradiction, decay — from measuring accumulated trust into governing
+// consequential action through trust-derived authority. One AIM.
+//
+// Cross-cutting rule (Correction #3): every model below carries tenantId and is
+// scoped to it; tenant isolation is enforced at the service layer on every read
+// and write, not only via this column's presence.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Tenant {
+  id         String   @id @default(uuid())
+  name       String
+  apiKeyHash String   @unique
+  status     String   @default("active")
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  entities         Entity[]
+  claims           Claim[]
+  contradictions   Contradiction[]
+  signals          Signal[]
+  decisions        Decision[]
+  trustStates      TrustState[]
+  contexts         Context[]
+  policies         Policy[]
+  authorities      Authority[]
+  humanApprovals   HumanApproval[]
+  actions          Action[]
+  outcomes         Outcome[]
+  governanceEvents GovernanceEvent[]
+}
+
+// Unifies "who/what acted" across a member, an external AI agent, a partner
+// organization, or a device — without duplicating identity for existing members.
+model Entity {
+  id           String   @id @default(uuid())
+  tenantId     String
+  entityType   String   // member | ai_agent | organization | device | system
+  linkedUserId String?  // set when this Entity IS an existing member
+  externalRef  String?  // e.g. "beaurity:partner:PTR-004", for non-member actors
+  name         String?
+  status       String   @default("active")
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  linkedUser User?  @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([linkedUserId])
+}
+
+// An assertion, distinct from the evidence that supports or refutes it.
+// status: PENDING | SUPPORTED | VERIFIED | CONTESTED | REFUTED | EXPIRED.
+// "VERIFIED" can never be set solely by assertedByEntityId (Directive rule).
+model Claim {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  subjectEntityId    String
+  predicate          String
+  objectValue        Json
+  assertedByEntityId String?
+  status             String    @default("pending")
+  confidence         Float?
+  contextId          String?
+  assertedAt         DateTime  @default(now())
+  expiresAt          DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([subjectEntityId])
+}
+
+// Correction #8 — a contradiction is structurally persistent, not only a flag
+// inside TrustState.explanation. status: DETECTED | UNRESOLVED | CHALLENGED |
+// RESOLVED | UPHELD.
+model Contradiction {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  subjectEntityId      String
+  claimId              String?
+  evidenceIds          Json      // conflicting Evidence id set
+  signalIds            Json?
+  severity             Float
+  status               String    @default("detected")
+  detectedAt           DateTime  @default(now())
+  resolvedAt           DateTime?
+  resolutionEvidenceId String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([subjectEntityId])
+  @@index([claimId])
+}
+
+// Same five dimensions as today's AIM. Decoupled from any per-user running
+// score — this is the Trust Engine's own normalized input, separate from
+// AimEvent (see aimAnatomy.ts's reliability/consistency/peer_validation/
+// contradiction/decay taxonomy, reused as the vocabulary, not the table).
+model Signal {
+  id               String    @id @default(uuid())
+  tenantId         String
+  signalType       String
+  dimension        String    // reliability | consistency | peer_validation | contradiction | decay
+  sourceEntityId   String?
+  sourceEvidenceId String?
+  sourceOutcomeId  String?
+  targetEntityId   String?
+  targetClaimId    String?
+  targetDecisionId String?
+  direction        String    // positive | negative | neutral
+  strength         Float
+  confidence       Float
+  observedAt       DateTime
+  effectiveFrom    DateTime
+  expiresAt        DateTime?
+  operatorVersion  String?
+  metadata         Json?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([targetEntityId])
+  @@index([sourceEntityId])
+}
+
+// A proposed action awaiting evaluation before execution.
+// status: CREATED | EVALUATING | DECIDED | EXECUTED | BLOCKED | ESCALATED | EXPIRED.
+model Decision {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  proposedByEntityId String
+  targetEntityId     String?
+  decisionType       String
+  proposedAction     String
+  modelConfidence    Float?
+  contextId          String?
+  riskClass          String?
+  payload            Json
+  status             String   @default("created")
+  idempotencyKey     String?  @unique // dedupes duplicate DECISION submission only —
+                                       // see Action.idempotencyKey for execution safety
+  createdAt          DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([proposedByEntityId])
+  @@index([targetEntityId])
+}
+
+// One row per evaluation. Never overwritten, never a running total — a
+// reevaluation always creates a new row (Correction #9). subjectEntityId is
+// required (Correction #1): a TrustState must always answer "whose trust is
+// this," never inferred indirectly through the Decision.
+model TrustState {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  subjectEntityId    String
+  decisionId         String
+  contextId          String?
+  trustScore         Float
+  evidenceConfidence Float
+  reliability        Float?
+  consistency        Float?
+  evidenceStrength   Float?
+  peerValidation     Float?
+  contradiction      Float?
+  decay              Float?
+  trustClass         String    // VERY_HIGH | HIGH | MODERATE | UNCERTAIN | LOW | CRITICAL
+  evaluatedAt        DateTime  @default(now())
+  validUntil         DateTime?
+  engineVersion      String
+  explanation        Json      // signals used, weights, contradictions, bootstrap contribution
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([subjectEntityId])
+  @@index([decisionId])
+}
+
+model Context {
+  id          String   @id @default(uuid())
+  tenantId    String
+  contextType String
+  riskClass   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+// Correction #6 — immutable per version. A change is a new row
+// (policyKey + incremented version), never an in-place edit of `rules`.
+model Policy {
+  id           String   @id @default(uuid())
+  tenantId     String
+  policyKey    String   // human-readable, e.g. "POL_PAYMENT_001"
+  decisionType String
+  version      String   // e.g. "1.0"
+  rules        Json     // ordered condition → authority rules
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, policyKey, version])
+  @@index([tenantId])
+}
+
+// Correction #6 — policyVersion snapshotted at issuance (Policy rows are
+// immutable, so this always answers "what exact policy authorized this?").
+// Correction #4 — supersedesAuthorityId lets a human-approved executable
+// Authority formally replace an escalated one, instead of mutating it.
+// status: ISSUED | ACTIVE | CONSUMED | EXPIRED | REVOKED | RESOLVED.
+model Authority {
+  id                    String    @id @default(uuid())
+  tenantId              String
+  decisionId            String
+  trustStateId          String
+  policyId              String
+  policyVersion         String
+  authorityState        String    // EXECUTE | CONSTRAIN | CHALLENGE | ESCALATE | BLOCK
+  permittedActions      Json?
+  prohibitedActions     Json?
+  constraints           Json?     // the Decision Envelope
+  humanRequired         Boolean   @default(false)
+  reasonCodes           Json?
+  status                String    @default("issued")
+  supersedesAuthorityId String?
+  createdAt             DateTime  @default(now())
+  expiresAt             DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([decisionId])
+}
+
+// Correction #4 — the formal event that converts an ESCALATE'd Authority into
+// a new, executable one. Human review is never implicit.
+model HumanApproval {
+  id           String   @id @default(uuid())
+  tenantId     String
+  humanActorId String
+  decisionId   String
+  authorityId  String   // the ESCALATE'd Authority being resolved
+  scope        Json?
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([authorityId])
+}
+
+// Correction #5 — execution idempotency lives here, not on Decision (one
+// Decision can eventually permit more than one constrained operation).
+model Action {
+  id             String    @id @default(uuid())
+  tenantId       String
+  decisionId     String
+  authorityId    String
+  idempotencyKey String    @unique
+  payloadHash    String
+  actionType     String
+  payload        Json
+  status         String    @default("pending") // pending | executed | denied | failed
+  executedAt     DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([authorityId])
+  @@index([decisionId])
+}
+
+model Outcome {
+  id           String   @id @default(uuid())
+  tenantId     String
+  actionId     String
+  outcomeType  String
+  success      Boolean
+  observations Json?
+  status       String   @default("pending") // PENDING | OBSERVED | VERIFIED | DISPUTED | INGESTED
+  observedAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([actionId])
+}
+
+// Hash-chained the same way AimEvent.contentHash already works today — SHA-256
+// of the event's canonical fields, computed once, never mutated. Chained to
+// the previous event's hash per correlationId for tamper evidence.
+model GovernanceEvent {
+  id                   String   @id @default(uuid())
+  tenantId             String
+  correlationId        String
+  eventType            String
+  entityId             String?
+  decisionId           String?
+  trustStateId         String?
+  authorityId          String?
+  actionId             String?
+  outcomeId            String?
+  evidenceIds          Json?
+  signalIds            Json?
+  contradictions       Json?
+  rejectedAlternatives Json?
+  policyId             String?
+  policyVersion        String?
+  trustEngineVersion   String?
+  humanActorId         String?
+  humanOverride        Boolean?
+  eventPayload         Json
+  previousHash         String?
+  eventHash            String
+  createdAt            DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([correlationId])
 }

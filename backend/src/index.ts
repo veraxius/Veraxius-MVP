@@ -36,6 +36,14 @@ import evidenceRouter from "./routes/evidence";
 
 import publicReceiptsRouter from "./routes/publicReceipts";
 
+// MVP5 — AIM Trust & Authority Layer (Architecture Alignment FINAL). Entirely
+// new API namespace; nothing above this line is touched.
+import mvp5DecisionsRouter from "./routes/mvp5/decisions";
+import mvp5TrustRouter from "./routes/mvp5/trust";
+import mvp5AuthorityRouter from "./routes/mvp5/authority";
+import mvp5ActionsRouter from "./routes/mvp5/actions";
+import mvp5OutcomesRouter from "./routes/mvp5/outcomes";
+
 import { prisma } from "./config/prisma";
 
 import { applyDecayToAllUsers, runConsistencyCheck } from "./lib/aimV2";
@@ -99,6 +107,13 @@ app.use("/internal", internalRouter);
 app.use("/api/evidence", evidenceRouter);
 
 app.use("/api/public/receipt", publicReceiptsRouter);
+
+// MVP5 — AIM Trust & Authority Layer
+app.use("/api/decisions", mvp5DecisionsRouter);
+app.use("/api/trust", mvp5TrustRouter);
+app.use("/api/authority", mvp5AuthorityRouter);
+app.use("/api/actions", mvp5ActionsRouter);
+app.use("/api/outcomes", mvp5OutcomesRouter);
 
 
 
