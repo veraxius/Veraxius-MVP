@@ -44,6 +44,8 @@ import mvp5AuthorityRouter from "./routes/mvp5/authority";
 import mvp5ActionsRouter from "./routes/mvp5/actions";
 import mvp5OutcomesRouter from "./routes/mvp5/outcomes";
 import mvp5SetupRouter from "./routes/mvp5/setup";
+import mvp5EvidenceRouter from "./routes/mvp5/evidence";
+import mvp5SignalsRouter from "./routes/mvp5/signals";
 import { tenantRateLimiter } from "./middleware/mvp5RateLimit";
 
 import { prisma } from "./config/prisma";
@@ -116,6 +118,8 @@ app.use("/api/trust", tenantRateLimiter, mvp5TrustRouter);
 app.use("/api/authority", tenantRateLimiter, mvp5AuthorityRouter);
 app.use("/api/actions", tenantRateLimiter, mvp5ActionsRouter);
 app.use("/api/outcomes", tenantRateLimiter, mvp5OutcomesRouter);
+app.use("/api/evidence", tenantRateLimiter, mvp5EvidenceRouter);
+app.use("/api/signals", tenantRateLimiter, mvp5SignalsRouter);
 // mvp5SetupRouter declares its own full sub-paths (/entities, /contexts, /policies)
 app.use("/api", tenantRateLimiter, mvp5SetupRouter);
 

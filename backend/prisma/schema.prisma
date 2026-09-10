@@ -347,6 +347,9 @@ model Evidence {
   contentHash             String?   // Correction #7 — evidence integrity hash
   hashAlgorithm           String?
   canonicalizationVersion String?
+  tenantId                String?   // set only for MVP5-submitted Evidence; null for existing rows
+  content                 Json?     // the actual body for non-file evidence (attestations,
+                                     // API responses, verified claims) submitted via POST /api/evidence
 
   @@index([aimEventId])
   @@index([domainAimEventId])
@@ -354,6 +357,7 @@ model Evidence {
   @@index([uploadedBy])
   @@index([claimId])
   @@index([decisionId])
+  @@index([tenantId])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

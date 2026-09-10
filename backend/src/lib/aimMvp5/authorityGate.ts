@@ -236,3 +236,32 @@ export async function approveEscalatedAuthority(
 
 	return { authority: superseding, id: withPrefix(PREFIX.authority, superseding.id) };
 }
+
+/**
+ * Completes the documented Authority lifecycle (ISSUED → ACTIVE →
+ * CONSUMED/EXPIRED/REVOKED). Revocation is only valid before an Authority
+ * has been consumed by an Action — a consumed grant is history, not a live
+ * permission, so it cannot be revoked after the fact.
+ */
+export async function revokeAuthority(tenantId: string, authorityId: string, humanActorId: string, reason?: string) {
+	const authority = await prisma.authority.findFirst({ where: { id: authorityId, tenantId } });
+	if (!authority) return { error: "authority_not_found" as const };
+	if (!["issued", "active"].includes(authority.status)) {
+		return { error: "authority_not_revocable" as const };
+	}
+
+	const revoked = await prisma.authority.update({ where: { id: authority.id }, data: { status: "revoked" } });
+
+	await writeGovernanceEvent({
+		tenantId,
+		correlationId: authority.decisionId,
+		eventType: "authority.revoked",
+		decisionId: authority.decisionId,
+		authorityId: authority.id,
+		humanActorId,
+		humanOverride: true,
+		eventPayload: { reason: reason ?? null },
+	});
+
+	return { authority: revoked };
+}

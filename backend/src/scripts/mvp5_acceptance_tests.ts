@@ -10,7 +10,8 @@ import { randomBytes } from "crypto";
 import { prisma } from "../config/prisma";
 import { hashTenantApiKey } from "../middleware/tenantAuth";
 import { evaluateTrust } from "../lib/aimMvp5/trustEngine";
-import { evaluateAuthority, approveEscalatedAuthority, findEnvelopeViolation } from "../lib/aimMvp5/authorityGate";
+import { createHash } from "crypto";
+import { evaluateAuthority, approveEscalatedAuthority, findEnvelopeViolation, revokeAuthority } from "../lib/aimMvp5/authorityGate";
 import { writeGovernanceEvent, verifyGovernanceChain } from "../lib/aimMvp5/governance";
 
 let passed = 0;
@@ -302,6 +303,53 @@ async function main() {
 		const result = await evaluateTrust(otherTenant.id, decision.id);
 		check("AT-20", "evaluating a Decision under the wrong Tenant is rejected, not silently scoped", "error" in result && result.error === "decision_not_found");
 		await prisma.tenant.delete({ where: { id: otherTenant.id } });
+	}
+
+	// AT-21 — Evidence can arrive directly from outside the platform (Directive
+	// §8 "Evidence exists or arrives"), scoped to the Tenant, with an integrity hash.
+	{
+		const content = { claim: "vendor-verified", score: 0.87 };
+		const contentHash = createHash("sha256").update(JSON.stringify(content)).digest("hex");
+		const evidence = await prisma.evidence.create({
+			data: {
+				tenantId,
+				fileName: `attestation-${Date.now()}`,
+				fileUrl: "",
+				fileType: "application/json",
+				fileSize: 0,
+				evidenceType: "attestation",
+				content,
+				observedAt: new Date(),
+				contentHash,
+				hashAlgorithm: "sha256",
+				canonicalizationVersion: "1",
+			},
+		});
+		const reloaded = await prisma.evidence.findFirst({ where: { id: evidence.id, tenantId } });
+		check("AT-21", "externally-submitted Evidence is stored tenant-scoped with a content hash", reloaded !== null && reloaded.contentHash === contentHash);
+	}
+
+	// AT-22 — Signals can arrive directly from outside the platform, targeted at an Entity.
+	{
+		const target = await prisma.entity.create({ data: { tenantId, entityType: "organization", name: "at22-subject" } });
+		const signal = await prisma.signal.create({
+			data: { tenantId, signalType: "external", dimension: "peer_validation", targetEntityId: target.id, direction: "positive", strength: 0.7, confidence: 0.8, observedAt: new Date(), effectiveFrom: new Date() },
+		});
+		const reloaded = await prisma.signal.findFirst({ where: { id: signal.id, tenantId } });
+		check("AT-22", "an externally-submitted Signal is stored tenant-scoped against its target Entity", reloaded !== null && reloaded.targetEntityId === target.id);
+	}
+
+	// AT-23 — Authority lifecycle completes with a revoke path; a consumed Authority cannot be revoked.
+	{
+		const decision = await newDecision(1000);
+		const trust = await evaluateTrust(tenantId, decision.id);
+		if ("error" in trust) throw new Error("AT-23 setup failed");
+		const auth = await evaluateAuthority(tenantId, decision.id, trust.trustState.id, policy.id);
+		if ("error" in auth) throw new Error("AT-23 setup failed");
+
+		const revoked = await revokeAuthority(tenantId, auth.authority.id, "human-tester", "no longer needed");
+		const revokeAgain = await revokeAuthority(tenantId, auth.authority.id, "human-tester");
+		check("AT-23", "an issued Authority can be revoked once, and not a second time", !("error" in revoked) && revoked.authority.status === "revoked" && "error" in revokeAgain);
 	}
 
 	console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
