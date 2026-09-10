@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { mvp5Fetch } from "@/lib/mvp5Api";
+import { mvp5Fetch, getOperatorToken, saveOperatorToken } from "@/lib/mvp5Api";
 
 type TrustState = {
 	trust_state_id: string;
@@ -211,9 +211,11 @@ export default function Mvp5DecisionDetail() {
 					</div>
 
 					{escalatedPending && (
-						<ApproveForm authorityId={escalatedPending.authority_id} busy={busy} onApprove={(grant, actor, reason) =>
-							run(() => mvp5Fetch(`/api/authority/${escalatedPending.authority_id}/approve`, { method: "POST", body: JSON.stringify({ human_actor_id: actor, grant, reason }) }))
-						} />
+						<OperatorGate>
+							<ApproveForm authorityId={escalatedPending.authority_id} busy={busy} onApprove={(grant, reason) =>
+								run(() => mvp5Fetch(`/api/authority/${escalatedPending.authority_id}/approve`, { method: "POST", body: JSON.stringify({ grant, reason }) }))
+							} />
+						</OperatorGate>
 					)}
 				</section>
 
@@ -306,8 +308,7 @@ export default function Mvp5DecisionDetail() {
 	);
 }
 
-function ApproveForm({ authorityId, busy, onApprove }: { authorityId: string; busy: boolean; onApprove: (grant: "EXECUTE" | "CONSTRAIN" | "BLOCK", actor: string, reason: string) => void }) {
-	const [actor, setActor] = useState("");
+function ApproveForm({ authorityId, busy, onApprove }: { authorityId: string; busy: boolean; onApprove: (grant: "EXECUTE" | "CONSTRAIN" | "BLOCK", reason: string) => void }) {
 	const [reason, setReason] = useState("");
 	const [grant, setGrant] = useState<"EXECUTE" | "CONSTRAIN" | "BLOCK">("EXECUTE");
 
@@ -315,8 +316,7 @@ function ApproveForm({ authorityId, busy, onApprove }: { authorityId: string; bu
 		<div className="mt-4 rounded-lg border border-[var(--amber-border)] p-3">
 			<p className="text-sm font-semibold">Human review required</p>
 			<p className="mt-1 text-xs text-tertiary">Authority {authorityId.slice(0, 14)}… is escalated. Trust ≠ authority — this decision needs an explicit human call.</p>
-			<div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-				<input value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Your name / id" className="rounded-lg border border-[var(--divider)] bg-transparent px-2 py-1.5 text-xs" />
+			<div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
 				<select value={grant} onChange={(e) => setGrant(e.target.value as typeof grant)} className="rounded-lg border border-[var(--divider)] bg-transparent px-2 py-1.5 text-xs">
 					<option value="EXECUTE">Grant EXECUTE</option>
 					<option value="CONSTRAIN">Grant CONSTRAIN</option>
@@ -324,9 +324,66 @@ function ApproveForm({ authorityId, busy, onApprove }: { authorityId: string; bu
 				</select>
 				<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason" className="rounded-lg border border-[var(--divider)] bg-transparent px-2 py-1.5 text-xs" />
 			</div>
-			<button disabled={busy || !actor} onClick={() => onApprove(grant, actor, reason)} className="vx-btn-primary mt-2 rounded-lg px-4 py-1.5 text-xs font-semibold">
+			<button disabled={busy} onClick={() => onApprove(grant, reason)} className="vx-btn-primary mt-2 rounded-lg px-4 py-1.5 text-xs font-semibold">
 				Submit decision
 			</button>
+		</div>
+	);
+}
+
+// Approvals/revocations require a real, authenticated Tenant Operator
+// (X-Operator-Token) instead of a client-supplied human_actor_id string.
+// This gate logs one in (or registers one, first time) before showing
+// whatever human-review action it wraps.
+function OperatorGate({ children }: { children: ReactNode }) {
+	const [ready, setReady] = useState(() => Boolean(getOperatorToken()));
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	async function login(register: boolean) {
+		setBusy(true);
+		setError(null);
+		try {
+			if (register) {
+				const regRes = await mvp5Fetch("/api/tenant-operators", { method: "POST", body: JSON.stringify({ email, password }) });
+				if (!regRes.ok && regRes.status !== 409) {
+					const data = await regRes.json();
+					throw new Error(data?.error ?? "Failed to register operator");
+				}
+			}
+			const res = await mvp5Fetch("/api/tenant-operators/login", { method: "POST", body: JSON.stringify({ email, password }) });
+			const data = await res.json();
+			if (!res.ok) throw new Error(data?.error ?? "Invalid operator credentials");
+			saveOperatorToken(data.operator_token);
+			setReady(true);
+		} catch (e) {
+			setError(e instanceof Error ? e.message : "Unknown error");
+		} finally {
+			setBusy(false);
+		}
+	}
+
+	if (ready) return <>{children}</>;
+
+	return (
+		<div className="mt-4 rounded-lg border border-[var(--divider)] p-3">
+			<p className="text-sm font-semibold">Sign in as a Tenant Operator</p>
+			<p className="mt-1 text-xs text-tertiary">A human review needs a real, authenticated identity — not a free-text name. First time here? Register creates your operator account for this tenant.</p>
+			<div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+				<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="rounded-lg border border-[var(--divider)] bg-transparent px-2 py-1.5 text-xs" />
+				<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="rounded-lg border border-[var(--divider)] bg-transparent px-2 py-1.5 text-xs" />
+			</div>
+			{error && <p className="mt-2 text-xs text-red">{error}</p>}
+			<div className="mt-2 flex gap-2">
+				<button disabled={busy || !email || !password} onClick={() => login(false)} className="vx-btn-primary rounded-lg px-3 py-1.5 text-xs font-semibold">
+					Log in
+				</button>
+				<button disabled={busy || !email || !password} onClick={() => login(true)} className="rounded-lg border border-[var(--divider)] px-3 py-1.5 text-xs text-secondary hover-bg-surface">
+					Register + Log in
+				</button>
+			</div>
 		</div>
 	);
 }

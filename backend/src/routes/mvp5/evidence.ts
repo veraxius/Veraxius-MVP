@@ -10,7 +10,9 @@ const router = Router();
 router.use(requireTenant);
 
 /**
- * POST /api/evidence — Directive §8: "Evidence exists or arrives" is step 1
+ * POST /api/mvp5/evidence — mounted off the plain /api/evidence path since
+ * that's already the legacy member-auth file-upload route (see
+ * routes/evidence.ts). Directive §8: "Evidence exists or arrives" is step 1
  * of the required implementation chain, and Evidence "may include: documents,
  * observations, records, API responses, attestations, verified claims,
  * machine events, transaction results, human verification, policy results,
@@ -71,7 +73,7 @@ router.post("/", async (req, res) => {
 
 		return res.status(201).json({ evidence_id: withPrefix(PREFIX.evidence, evidence.id), content_hash: contentHash });
 	} catch (err) {
-		return internalError(res, err, "POST /api/evidence");
+		return internalError(res, err, "POST /api/mvp5/evidence");
 	}
 });
 
@@ -90,7 +92,7 @@ router.get("/", async (req, res) => {
 			})),
 		);
 	} catch (err) {
-		return internalError(res, err, "GET /api/evidence");
+		return internalError(res, err, "GET /api/mvp5/evidence");
 	}
 });
 

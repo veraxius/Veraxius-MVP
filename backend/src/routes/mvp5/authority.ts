@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireTenant } from "../../middleware/tenantAuth";
+import { requireTenantOperator } from "../../middleware/tenantOperatorAuth";
 import { invalidPayload, internalError } from "../../lib/validation";
 import { evaluateAuthority, approveEscalatedAuthority, revokeAuthority } from "../../lib/aimMvp5/authorityGate";
 import { stripPrefix, withPrefix, PREFIX } from "../../lib/aimMvp5/ids";
@@ -46,7 +47,6 @@ router.post("/evaluate", async (req, res) => {
 });
 
 const ApproveSchema = z.object({
-	human_actor_id: z.string().min(1),
 	grant: z.enum(["EXECUTE", "CONSTRAIN", "BLOCK"]),
 	scope: z.record(z.any()).optional(),
 	reason: z.string().max(2000).optional(),
@@ -54,8 +54,10 @@ const ApproveSchema = z.object({
 
 // POST /api/authority/:id/approve — Correction #4. Formally resolves an
 // ESCALATE'd Authority via a HumanApproval + a new superseding Authority.
-// Never mutates the original row's authorityState.
-router.post("/:id/approve", async (req, res) => {
+// Never mutates the original row's authorityState. Requires an authenticated
+// Tenant Operator (X-Operator-Token) — the actor identity is no longer a
+// client-supplied string, it's whoever actually logged in.
+router.post("/:id/approve", requireTenantOperator, async (req, res) => {
 	try {
 		const parsed = ApproveSchema.safeParse(req.body);
 		if (!parsed.success) return invalidPayload(res);
@@ -65,7 +67,7 @@ router.post("/:id/approve", async (req, res) => {
 		const result = await approveEscalatedAuthority(
 			tenantId,
 			authorityId,
-			parsed.data.human_actor_id,
+			req.operatorEmail as string,
 			parsed.data.grant,
 			parsed.data.scope,
 			parsed.data.reason,
@@ -85,21 +87,20 @@ router.post("/:id/approve", async (req, res) => {
 });
 
 const RevokeSchema = z.object({
-	human_actor_id: z.string().min(1),
 	reason: z.string().max(2000).optional(),
 });
 
 // POST /api/authority/:id/revoke — completes the ISSUED→ACTIVE→CONSUMED/
 // EXPIRED/REVOKED lifecycle. Only an Authority not yet consumed by an
-// Action can be revoked.
-router.post("/:id/revoke", async (req, res) => {
+// Action can be revoked. Requires an authenticated Tenant Operator.
+router.post("/:id/revoke", requireTenantOperator, async (req, res) => {
 	try {
 		const parsed = RevokeSchema.safeParse(req.body);
 		if (!parsed.success) return invalidPayload(res);
 		const tenantId = req.tenantId as string;
 		const authorityId = stripPrefix(req.params.id);
 
-		const result = await revokeAuthority(tenantId, authorityId, parsed.data.human_actor_id, parsed.data.reason);
+		const result = await revokeAuthority(tenantId, authorityId, req.operatorEmail as string, parsed.data.reason);
 		if ("error" in result) return res.status(409).json({ error: result.error });
 
 		const a = result.authority;

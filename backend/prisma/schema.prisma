@@ -395,6 +395,27 @@ model Tenant {
   actions          Action[]
   outcomes         Outcome[]
   governanceEvents GovernanceEvent[]
+  operators        TenantOperator[]
+}
+
+// A real, authenticated human who can act on behalf of a Tenant — closes the
+// gap where human_actor_id on an approval/revocation was previously free
+// text. Deliberately separate from Veraxius's own User/member accounts:
+// an operator belongs to exactly one Tenant and can never act on another's.
+model TenantOperator {
+  id           String    @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  name         String?
+  status       String    @default("active") // active | disabled
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
 }
 
 // Unifies "who/what acted" across a member, an external AI agent, a partner

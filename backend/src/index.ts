@@ -46,6 +46,9 @@ import mvp5OutcomesRouter from "./routes/mvp5/outcomes";
 import mvp5SetupRouter from "./routes/mvp5/setup";
 import mvp5EvidenceRouter from "./routes/mvp5/evidence";
 import mvp5SignalsRouter from "./routes/mvp5/signals";
+import mvp5OperatorsRouter from "./routes/mvp5/operators";
+import mvp5TenantsRouter from "./routes/mvp5/tenants";
+import mvp5OpsRouter from "./routes/mvp5/ops";
 import { tenantRateLimiter } from "./middleware/mvp5RateLimit";
 
 import { prisma } from "./config/prisma";
@@ -118,8 +121,14 @@ app.use("/api/trust", tenantRateLimiter, mvp5TrustRouter);
 app.use("/api/authority", tenantRateLimiter, mvp5AuthorityRouter);
 app.use("/api/actions", tenantRateLimiter, mvp5ActionsRouter);
 app.use("/api/outcomes", tenantRateLimiter, mvp5OutcomesRouter);
-app.use("/api/evidence", tenantRateLimiter, mvp5EvidenceRouter);
+// Mounted under /api/mvp5/evidence, not /api/evidence — that path is already
+// taken by the legacy member-auth file-upload evidence route above, and
+// Express would never reach this router if it were mounted there too.
+app.use("/api/mvp5/evidence", tenantRateLimiter, mvp5EvidenceRouter);
 app.use("/api/signals", tenantRateLimiter, mvp5SignalsRouter);
+app.use("/api/tenant-operators", tenantRateLimiter, mvp5OperatorsRouter);
+app.use("/api/tenants", mvp5TenantsRouter);
+app.use("/api/ops", tenantRateLimiter, mvp5OpsRouter);
 // mvp5SetupRouter declares its own full sub-paths (/entities, /contexts, /policies)
 app.use("/api", tenantRateLimiter, mvp5SetupRouter);
 
