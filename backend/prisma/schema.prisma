@@ -481,6 +481,8 @@ model Signal {
   expiresAt        DateTime?
   operatorVersion  String?
   metadata         Json?
+  decayModel       String?   // "exponential" — Directive §20; null = no decay beyond expiresAt
+  halfLifeDays     Float?    // required when decayModel is set
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

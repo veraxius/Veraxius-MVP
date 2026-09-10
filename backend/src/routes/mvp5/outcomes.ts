@@ -92,6 +92,8 @@ router.post("/", async (req, res) => {
 					observedAt: now,
 					effectiveFrom: now,
 					operatorVersion: TRUST_ENGINE_VERSION,
+					decayModel: "exponential",
+					halfLifeDays: 180, // an outcome's relevance to trust roughly halves every ~6 months
 				},
 			});
 			signalId = signal.id;

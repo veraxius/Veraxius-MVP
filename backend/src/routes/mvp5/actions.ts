@@ -5,6 +5,7 @@ import { prisma } from "../../config/prisma";
 import { requireTenant } from "../../middleware/tenantAuth";
 import { invalidPayload, internalError } from "../../lib/validation";
 import { writeGovernanceEvent } from "../../lib/aimMvp5/governance";
+import { findEnvelopeViolation } from "../../lib/aimMvp5/authorityGate";
 import { stripPrefix, withPrefix, PREFIX } from "../../lib/aimMvp5/ids";
 
 const router = Router();
@@ -70,6 +71,8 @@ router.post("/", async (req, res) => {
 		if (prohibited.includes(body.action_type)) return deny("ACTION_TYPE_PROHIBITED");
 		const permitted = authority.permittedActions as string[] | null;
 		if (permitted && permitted.length > 0 && !permitted.includes(body.action_type)) return deny("ACTION_TYPE_NOT_PERMITTED");
+		const violatedKey = findEnvelopeViolation(body.payload, (authority.constraints as Record<string, unknown> | null) ?? null);
+		if (violatedKey) return deny(`ENVELOPE_VIOLATION:${violatedKey}`);
 
 		// 3. Atomic validate → consume → execute (§F). The conditional update is
 		// the compare-and-swap: only the request that flips ACTIVE -> CONSUMED

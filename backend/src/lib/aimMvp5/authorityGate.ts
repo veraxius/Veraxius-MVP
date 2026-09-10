@@ -15,8 +15,22 @@ export type AuthorityState = (typeof AUTHORITY_STATES)[number];
 
 const EVIDENCE_CONFIDENCE_CHALLENGE_THRESHOLD = 40;
 
-type RuleCondition = Record<string, { lte?: number; gte?: number; lt?: number; gt?: number; eq?: unknown }>;
-type PolicyRule = { condition: RuleCondition; authority: AuthorityState };
+type RuleConditionOps = {
+	lte?: number;
+	gte?: number;
+	lt?: number;
+	gt?: number;
+	eq?: string | number | boolean;
+	in?: (string | number)[];
+	not_in?: (string | number)[];
+};
+type RuleCondition = Record<string, RuleConditionOps>;
+// Directive §15 — Decision Envelope constraints beyond amount: scope, resource,
+// tool, duration, frequency, data_access, counterparty, geography,
+// validity_window, required_evidence, human_approval_required,
+// escalation_conditions. A Policy rule may attach any subset of these; they
+// become Authority.constraints verbatim (not the raw request payload).
+type PolicyRule = { condition: RuleCondition; authority: AuthorityState; envelope?: Record<string, unknown> };
 
 function readPayloadValue(payload: Record<string, unknown>, trustScore: number, evidenceConfidence: number, key: string): unknown {
 	if (key === "trust_score") return trustScore;
@@ -27,14 +41,45 @@ function readPayloadValue(payload: Record<string, unknown>, trustScore: number, 
 function matchesCondition(payload: Record<string, unknown>, trustScore: number, evidenceConfidence: number, condition: RuleCondition): boolean {
 	for (const [key, ops] of Object.entries(condition)) {
 		const value = readPayloadValue(payload, trustScore, evidenceConfidence, key);
-		if (typeof value !== "number") return false;
-		if (ops.lte !== undefined && !(value <= ops.lte)) return false;
-		if (ops.gte !== undefined && !(value >= ops.gte)) return false;
-		if (ops.lt !== undefined && !(value < ops.lt)) return false;
-		if (ops.gt !== undefined && !(value > ops.gt)) return false;
+		if (ops.in !== undefined) {
+			if (typeof value !== "string" && typeof value !== "number") return false;
+			if (!ops.in.includes(value)) return false;
+		}
+		if (ops.not_in !== undefined) {
+			if ((typeof value === "string" || typeof value === "number") && ops.not_in.includes(value)) return false;
+		}
 		if (ops.eq !== undefined && value !== ops.eq) return false;
+		if (ops.lte !== undefined || ops.gte !== undefined || ops.lt !== undefined || ops.gt !== undefined) {
+			if (typeof value !== "number") return false;
+			if (ops.lte !== undefined && !(value <= ops.lte)) return false;
+			if (ops.gte !== undefined && !(value >= ops.gte)) return false;
+			if (ops.lt !== undefined && !(value < ops.lt)) return false;
+			if (ops.gt !== undefined && !(value > ops.gt)) return false;
+		}
 	}
 	return true;
+}
+
+/**
+ * Validates a requested action's payload against the Decision Envelope
+ * stored on Authority.constraints (Directive §15). Each envelope key may be
+ * either a plain value (exact-match requirement) or an operator object
+ * (the same lte/gte/in/not_in/eq shape Policy rules use) — e.g.
+ * { geography: { in: ["US", "CA"] }, amount: { lte: 5000 } }.
+ * Returns the first violated key, or null if every constraint is satisfied.
+ */
+export function findEnvelopeViolation(payload: Record<string, unknown>, envelope: Record<string, unknown> | null): string | null {
+	if (!envelope) return null;
+	for (const [key, expected] of Object.entries(envelope)) {
+		const actual = payload[key];
+		if (expected && typeof expected === "object" && !Array.isArray(expected)) {
+			const ok = matchesCondition(payload, NaN, NaN, { [key]: expected as RuleConditionOps });
+			if (!ok) return key;
+		} else if (actual !== undefined && actual !== expected) {
+			return key;
+		}
+	}
+	return null;
 }
 
 function reasonForRejected(state: AuthorityState, chosen: AuthorityState): string {
@@ -61,6 +106,10 @@ export async function evaluateAuthority(tenantId: string, decisionId: string, tr
 
 	let authorityState: AuthorityState;
 	const reasonCodes: string[] = [];
+	// Directive §15 — the Decision Envelope a matched rule attaches. Falls back
+	// to the raw decision payload only when the rule declares no envelope, for
+	// backward compatibility with simple amount-only policies.
+	let envelope: Record<string, unknown> | undefined;
 
 	if (materialContradiction) {
 		authorityState = "CHALLENGE";
@@ -74,6 +123,7 @@ export async function evaluateAuthority(tenantId: string, decisionId: string, tr
 		const payload = (decision.payload as Record<string, unknown>) ?? {};
 		const matched = ruleList.find((r) => matchesCondition(payload, trustState.trustScore, trustState.evidenceConfidence, r.condition));
 		authorityState = matched?.authority ?? "ESCALATE";
+		envelope = matched?.envelope ?? (payload as Record<string, unknown>);
 		reasonCodes.push(matched ? "POLICY_RULE_MATCH" : "NO_POLICY_RULE_MATCHED");
 		if (authorityState === "ESCALATE" && !matched) reasonCodes.push("HIGH_CONSEQUENCE_ACTION");
 	}
@@ -97,7 +147,7 @@ export async function evaluateAuthority(tenantId: string, decisionId: string, tr
 			policyId: policy.id,
 			policyVersion: policy.version, // Correction #6 — snapshotted, immutable
 			authorityState,
-			constraints: (decision.payload as object) ?? undefined,
+			constraints: (envelope as object) ?? undefined,
 			humanRequired,
 			reasonCodes,
 			status,

@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { writeGovernanceEvent } from "./governance";
 import { withPrefix, PREFIX } from "./ids";
+import { detectContradictions } from "./contradictionDetector";
 
 /**
  * MVP5 Trust Engine (Architecture Alignment FINAL §B/§C.1).
@@ -33,6 +34,22 @@ const SIGNAL_DIMENSION_TO_FIELD: Record<string, Dimension> = {
 	decay: "decay",
 };
 
+/**
+ * Directive §20 — effective_strength(t) = original_strength × decay_function(age).
+ * Exponential half-life: a signal at exactly halfLifeDays old contributes at
+ * half its original strength, a quarter at 2×halfLifeDays, and so on. Signals
+ * with no decayModel keep their full strength until expiresAt (unchanged
+ * behavior — decay is opt-in per signal, not assumed for all evidence).
+ */
+function applyDecay(signal: { strength: number; decayModel: string | null; halfLifeDays: number | null; effectiveFrom: Date }, now: Date): number {
+	if (signal.decayModel !== "exponential" || !signal.halfLifeDays || signal.halfLifeDays <= 0) {
+		return signal.strength;
+	}
+	const ageDays = (now.getTime() - signal.effectiveFrom.getTime()) / (1000 * 60 * 60 * 24);
+	if (ageDays <= 0) return signal.strength;
+	return signal.strength * Math.pow(0.5, ageDays / signal.halfLifeDays);
+}
+
 function trustClassFor(score: number): string {
 	if (score >= 90) return "VERY_HIGH";
 	if (score >= 75) return "HIGH";
@@ -59,6 +76,11 @@ export async function evaluateTrust(tenantId: string, decisionId: string) {
 			OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
 		},
 	});
+
+	// Directive §10 — detect new contradictions from the real signals before
+	// bootstrap synthesis (the bootstrap signal is not real evidence and must
+	// never itself be flagged as contradictory).
+	await detectContradictions(tenantId, subjectEntityId, signals);
 
 	// Correction #2 — bootstrap rule.
 	const entity = await prisma.entity.findFirst({ where: { id: subjectEntityId, tenantId } });
@@ -93,6 +115,8 @@ export async function evaluateTrust(tenantId: string, decisionId: string) {
 				expiresAt: null,
 				operatorVersion: TRUST_ENGINE_VERSION,
 				metadata: null,
+				decayModel: null,
+				halfLifeDays: null,
 			} as (typeof signals)[number]);
 		}
 	}
@@ -111,7 +135,8 @@ export async function evaluateTrust(tenantId: string, decisionId: string) {
 	for (const s of effectiveSignals) {
 		const field = SIGNAL_DIMENSION_TO_FIELD[s.dimension];
 		if (!field) continue;
-		const signed = s.direction === "negative" ? -s.strength : s.direction === "neutral" ? 0 : s.strength;
+		const decayed = applyDecay(s, now);
+		const signed = s.direction === "negative" ? -decayed : s.direction === "neutral" ? 0 : decayed;
 		sums[field].weighted += signed * s.confidence;
 		sums[field].weight += s.confidence;
 		sums[field].count += 1;

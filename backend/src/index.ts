@@ -43,6 +43,8 @@ import mvp5TrustRouter from "./routes/mvp5/trust";
 import mvp5AuthorityRouter from "./routes/mvp5/authority";
 import mvp5ActionsRouter from "./routes/mvp5/actions";
 import mvp5OutcomesRouter from "./routes/mvp5/outcomes";
+import mvp5SetupRouter from "./routes/mvp5/setup";
+import { tenantRateLimiter } from "./middleware/mvp5RateLimit";
 
 import { prisma } from "./config/prisma";
 
@@ -109,11 +111,13 @@ app.use("/api/evidence", evidenceRouter);
 app.use("/api/public/receipt", publicReceiptsRouter);
 
 // MVP5 — AIM Trust & Authority Layer
-app.use("/api/decisions", mvp5DecisionsRouter);
-app.use("/api/trust", mvp5TrustRouter);
-app.use("/api/authority", mvp5AuthorityRouter);
-app.use("/api/actions", mvp5ActionsRouter);
-app.use("/api/outcomes", mvp5OutcomesRouter);
+app.use("/api/decisions", tenantRateLimiter, mvp5DecisionsRouter);
+app.use("/api/trust", tenantRateLimiter, mvp5TrustRouter);
+app.use("/api/authority", tenantRateLimiter, mvp5AuthorityRouter);
+app.use("/api/actions", tenantRateLimiter, mvp5ActionsRouter);
+app.use("/api/outcomes", tenantRateLimiter, mvp5OutcomesRouter);
+// mvp5SetupRouter declares its own full sub-paths (/entities, /contexts, /policies)
+app.use("/api", tenantRateLimiter, mvp5SetupRouter);
 
 
 
