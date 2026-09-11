@@ -93,7 +93,10 @@ module.exports = {
     streakPenaltyMultiplier: 1.5,
     streakBonusWindow:      5,
     streakPenaltyWindow:    3,
-    verifiedBoost:          1.5,   // was 0.15 (×10)
+    verifiedBoost:          0.15,  // NOT rescaled with the others — this adds to `quality`
+                                    // (0..1 input), not to a score delta, so ×10 saturated
+                                    // Math.min(1, quality + boost) to 1 for any verified
+                                    // outcome regardless of actual quality (see recordOutcome)
   },
 
   // ─── Variable 2: Consistency ─────────────────────────────────────────────
